@@ -1,20 +1,21 @@
 import os
 import json
+import time
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 import uvicorn
 
 app = FastAPI()
 OWNER_FILE = "architect.lock"
-network_stats = {
-    "nodes_online": 150,
-    "total_power": "4.2 TFlops",
-    "active_cities": "Москва, Новосибирск, Лондон..."
+# Хранилище реальных анонимных данных (в памяти сервера)
+active_nodes = {
+    "count": 0,
+    "locations": [] # [{"lat": 55.75, "lon": 37.61, "count": 120}]
 }
 
 @app.get("/", response_class=HTMLResponse)
 async def landing():
-    """Современный светлый лендинг с заглушкой для карты"""
+    """Лендинг с интерактивной картой Leaflet.js"""
     return f"""
     <!DOCTYPE html>
     <html lang="ru">
@@ -22,42 +23,76 @@ async def landing():
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>ShadowGrid | Безопасная Сеть</title>
+        <link rel="stylesheet" href="unpkg.com" />
+        <script src="unpkg.com"></script>
         <style>
-            body {{ background: #FFFFFF; color: #333; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }}
-            .container {{ padding: 40px; text-align: center; width: 700px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); border-radius: 8px; background: #FFF; }}
-            h1 {{ font-size: 2.5em; color: #0066cc; border-bottom: 2px solid #EEE; padding-bottom: 10px; }}
-            p {{ color: #555; margin-bottom: 20px; }}
-            .stats {{ margin-top: 20px; padding: 15px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 5px; }}
-            #node-count {{ font-weight: bold; color: #FF003C; font-size: 1.2em; }}
-            .map-placeholder {{ margin-top: 20px; padding: 50px; background: #eee; border-radius: 5px; border: 1px dashed #999; color: #777; }}
-            .btn {{ display: inline-block; padding: 10px 20px; background: #0066cc; color: #FFF; text-decoration: none; border: none; border-radius: 5px; margin-top: 20px; font-weight: bold; }}
-            .btn:hover {{ background: #0056b3; }}
+            body {{ background: #FFFFFF; color: #333; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }}
+            .container {{ padding: 20px; text-align: center; width: 90%; max-width: 800px; }}
+            h1 {{ color: #0066cc; }}
+            #map {{ height: 500px; width: 100%; margin-top: 20px; }}
+            .stats {{ margin-bottom: 10px; font-weight: bold; }}
+            .btn {{ padding: 10px 20px; background: #0066cc; color: #FFF; text-decoration: none; border-radius: 5px; margin-top: 20px; }}
         </style>
     </head>
     <body>
         <div class="container">
-            <h1>ShadowGrid Network</h1>
-            <p>Децентрализованная инфраструктура, которой вы можете доверять.</p>
-            
-            <div class="stats">
-                <p>Узлов онлайн: <span id="node-count">{network_stats["nodes_online"]}</span> | Общая мощность: {network_stats["total_power"]}</p>
-            </div>
-
-            <div class="map-placeholder">
-                [ Заглушка для интерактивной контурной карты мира из вашего изображения ]
-            </div>
-
+            <h1>ShadowGrid Network Status</h1>
+            <p class="stats">Узлов онлайн: <span id="node-count">0</span></p>
+            <div id="map"></div>
             <a href="/download" class="btn">Скачать приложение</a>
         </div>
+
         <script>
-            // JavaScript для обновления счетчика
-            document.getElementById('node-count').innerText = {network_stats["nodes_online"]};
+            const map = L.map('map').setView([20, 0], 2);
+            // Используем черно-белую карту для стиля контурной карты
+            L.tileLayer('https://{s}.tiles.wmflabs.org/bw-mapnik/{z}/{x}/{y}.png', {{
+                maxZoom: 18,
+                attribution: '© OpenStreetMap contributors'
+            }}).addTo(map);
+
+            const ws = new WebSocket('wss://' + window.location.host + '/ws/data');
+
+            ws.onmessage = function(event) {{
+                const data = JSON.parse(event.data);
+                if (data.status === 'UPDATE') {{
+                    document.getElementById('node-count').innerText = data.payload.count;
+                    // Очистка старых маркеров и добавление новых
+                    map.eachLayer(function (layer) {{
+                        if (!!layer._leaflet_id && layer._leaflet_id !== map._leaflet_id) {{
+                            map.removeLayer(layer);
+                        }}
+                    }});
+                    data.payload.locations.forEach(loc => {{
+                        L.circleMarker([loc.lat, loc.lon], {{color: 'red', fillColor: '#f03', fillOpacity: 0.8, radius: Math.log(loc.count) * 4}}).addTo(map)
+                         .bindPopup(`Узлов: ${loc.count}`);
+                    }});
+                }}
+            }};
         </script>
     </body>
     </html>
     """
 
-# ... (остальной код FastAPI и WebSocket без изменений) ...
+# Канал для получения реальных данных от клиентов (будущего мессенджера)
+@app.websocket("/ws/data")
+async def data_websocket(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        # Имитация получения данных от 150 клиентов
+        active_nodes["count"] = 150
+        active_nodes["locations"] = [{"lat": 55.75, "lon": 37.61, "count": 120}, {"lat": 51.5, "lon": -0.1, "count": 30}]
+        
+        while True:
+            # Отправка обновлений на лендинг каждые 10 секунд
+            await websocket.send_json({"status": "UPDATE", "payload": active_nodes})
+            await websocket.receive_text() # Ожидание пинга от клиента
+            time.sleep(10)
+    except WebSocketDisconnect:
+        pass
+
+# ... (остальной код FastAPI для /ws/master и /download без изменений) ...
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
