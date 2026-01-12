@@ -1,36 +1,81 @@
-<!-- Внутри <script> в index.html обновите блок прослушивания Gun -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShadowGrid // Beacon</title>
+    <!-- CDN 2026 года -->
+    <script src="cdn.jsdelivr.net"></script>
+    <script src="cdn.jsdelivr.net"></script>
+    <script src="cdn.jsdelivr.net"></script>
+    <style>
+        :root { --bg: #0e1621; --chat: #17212b; --text: #f5f5f5; --accent: #2481cc; --hint: #708499; }
+        body { background: var(--bg); color: var(--text); font-family: sans-serif; margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .tg-container { width: 100%; max-width: 400px; background: var(--chat); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); overflow: hidden; margin: 10px; }
+        .header { padding: 15px; background: var(--chat); border-bottom: 1px solid #000; text-align: center; color: var(--accent); font-weight: bold; }
+        .section { padding: 20px; border-bottom: 1px solid #232e3c; }
+        .section h3 { margin: 0 0 10px 0; font-size: 16px; color: var(--accent); }
+        .section p { margin: 0; font-size: 13px; color: var(--hint); }
+        .dl-area { padding: 20px; background: var(--bg); text-align: center; }
+        .btn-dl { background: var(--accent); color: #fff; border: none; width: 100%; padding: 15px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .btn-dl:disabled { background: #2c3b4a; color: var(--hint); cursor: not-allowed; }
+        #status { font-size: 11px; margin-top: 10px; color: #52fb5a; }
+    </style>
+</head>
+<body>
+
+<div class="tg-container">
+    <div class="header">SHADOWGRID // 2026</div>
+    
+    <div class="section">
+        <h3>Для пользователей</h3>
+        <p>Децентрализованный доступ к Mesh-сетям и dVPN. Никаких блокировок.</p>
+    </div>
+
+    <div class="section">
+        <h3>Для инвесторов</h3>
+        <p>Монетизация мощностей через PoUW. Ваш Хаб приносит доход.</p>
+    </div>
+
+    <div class="dl-area">
+        <div id="msg" style="font-size: 14px; margin-bottom: 15px;">Ожидание сигнала Архитектора...</div>
+        <button id="dl-btn" class="btn-dl" disabled>ПРОВЕРКА ПОДПИСИ...</button>
+        <div id="status">P2P: READY</div>
+    </div>
+</div>
+
 <script>
-    // Вставьте сюда MASTER_ID, который выдаст админка после Генезиса
-    const ARCHITECT_PUB = "ВАШ_ПУБЛИЧНЫЙ_КЛЮЧ_ИЗ_АДМИНКИ"; 
+    // ВСТАВЬТЕ ВАШ MASTER_ID ИЗ АДМИНКИ СЮДА
+    const ARCHITECT_PUB = "ВАШ_ПУБЛИЧНЫЙ_КЛЮЧ_ПОСЛЕ_ГЕНЕЗИСА"; 
+    
+    // Инициализация GunDB
     const gun = Gun(['gun-manhattan.herokuapp.com']);
 
-    // Слушаем канал ShadowGrid
     gun.get('shadowgrid').get('signal').on(async (data) => {
         if (!data) return;
-
         try {
-            // В 2026 Gun.SEA.verify проверяет структуру {msg, pub, sig}
-            // Мы передаем данные и ожидаем, что они подписаны ARCHITECT_PUB
-            const isVerified = await Gun.SEA.verify(data, ARCHITECT_PUB);
-
-            if (isVerified) {
-                // data.msg — это вложенный объект с magnet и ts
-                const magnetLink = isVerified.magnet; 
-                
-                document.getElementById('status-text').innerText = "КАНАЛ ЗАЩИЩЕН: СИГНАЛ ПОДТВЕРЖДЕН";
+            // Проверка цифровой подписи (Логика 2026)
+            const verified = await Gun.SEA.verify(data, ARCHITECT_PUB);
+            
+            if (verified) {
+                document.getElementById('msg').innerText = "СИГНАЛ ВЕРИФИЦИРОВАН";
                 const btn = document.getElementById('dl-btn');
-                btn.innerText = "СКАЧАТЬ АВТОНОМНЫЙ ХАБ (.EXE)";
+                btn.innerText = "СКАЧАТЬ ХАБ (.EXE)";
                 btn.disabled = false;
-                btn.onclick = () => startP2P(magnetLink);
-                
-                console.log("Verified Magnet:", magnetLink);
-            } else {
-                document.getElementById('status-text').innerText = "ВНИМАНИЕ: НЕПОДТВЕРЖДЕННЫЙ СИГНАЛ";
+                btn.onclick = () => {
+                    const client = new WebTorrent();
+                    client.add(verified.magnet, (torrent) => {
+                        torrent.files[0].getBlobURL((err, url) => {
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = "ShadowHub_2026.exe";
+                            a.click();
+                        });
+                    });
+                };
             }
-        } catch (e) {
-            console.error("Криптографическая ошибка:", e);
-        }
+        } catch (e) { console.error("Crypto error:", e); }
     });
-
-    // ... остальной код (startP2P) без изменений
 </script>
+</body>
+</html>
