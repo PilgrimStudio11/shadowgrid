@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShadowGrid Beacon</title>
+    <script src="cdn.jsdelivr.net"></script>
+    <script src="cdn.jsdelivr.net"></script>
+    <script src="cdn.jsdelivr.net"></script>
+    <style>
+        :root {
+            --tg-bg: #17212b;
+            --tg-sec-bg: #0e1621;
+            --tg-text: #f5f5f5;
+            --tg-hint: #708499;
+            --tg-button: #2481cc;
+            --tg-button-text: #ffffff;
+            --tg-accent: #64b5ef;
+        }
+        body { background-color: var(--tg-sec-bg); color: var(--tg-text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .tg-container { width: 100%; max-width: 400px; background: var(--tg-bg); border-radius: 0; height: 100vh; display: flex; flex-direction: column; }
+        @media (min-width: 450px) { .tg-container { height: 600px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); } }
+        .header { padding: 15px; background: var(--tg-bg); border-bottom: 1px solid #000; text-align: center; }
+        .header h1 { font-size: 18px; margin: 0; color: var(--tg-accent); }
+        .chat-area { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+        .msg { background: var(--tg-sec-bg); padding: 12px; border-radius: 12px; max-width: 85%; font-size: 14px; position: relative; line-height: 1.4; border-bottom-left-radius: 2px; }
+        .msg-time { font-size: 10px; color: var(--tg-hint); text-align: right; margin-top: 5px; }
+        .footer { padding: 20px; background: var(--tg-bg); border-top: 1px solid #000; }
+        .btn-dl { background: var(--tg-button); color: var(--tg-button-text); border: none; width: 100%; padding: 14px; border-radius: 10px; font-weight: 600; cursor: pointer; transition: 0.2s; text-transform: uppercase; font-size: 13px; }
+        .btn-dl:disabled { background: #2c3b4a; color: var(--tg-hint); cursor: not-allowed; }
+        .status-dot { height: 8px; width: 8px; background-color: #52fb5a; border-radius: 50%; display: inline-block; margin-right: 5px; }
+    </style>
+</head>
+<body>
+    <div class="tg-container">
+        <div class="header">
+            <h1>ShadowGrid // Маяк</h1>
+            <div style="font-size: 10px; color: var(--tg-hint);"><span class="status-dot"></span> СЕТЬ АКТИВНА</div>
+        </div>
+        <div class="chat-area" id="chat">
+            <div class="msg">
+                Добро пожаловать в ShadowGrid. Это децентрализованный канал вещания Архитектора.
+                <div class="msg-time">09:00</div>
+            </div>
+            <div class="msg">
+                Ожидание каноничного сигнала от MASTER_ID...
+                <div class="msg-time">09:01</div>
+            </div>
+        </div>
+        <div class="footer">
+            <button id="dl-btn" class="btn-dl" disabled>Сигнал не обнаружен</button>
+            <div id="p2p-status" style="font-size: 10px; color: var(--tg-hint); text-align: center; margin-top: 10px;">P2P: CONNECTING...</div>
+        </div>
+    </div>
+
+    <script>
+        const ARCHITECT_PUB = "ВАШ_ПУБЛИЧНЫЙ_КЛЮЧ_ИЗ_АДМИНКИ"; 
+        const gun = Gun(['gun-manhattan.herokuapp.com']);
+        
+        gun.get('shadowgrid').get('signal').on(async (data) => {
+            if (!data) return;
+            const isVerified = await Gun.SEA.verify(data.signed_hash, ARCHITECT_PUB);
+            
+            if (isVerified) {
+                addMessage("Сигнал подтвержден. Доступно обновление ПО.");
+                const btn = document.getElementById('dl-btn');
+                btn.innerText = "Скачать Хаб (v.2026.1)";
+                btn.disabled = false;
+                btn.onclick = () => startP2P(data.magnet);
+            }
+        });
+
+        function addMessage(text) {
+            const chat = document.getElementById('chat');
+            const div = document.createElement('div');
+            div.className = 'msg';
+            div.innerHTML = `${text}<div class="msg-time">${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>`;
+            chat.appendChild(div);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        function startP2P(magnet) {
+            const client = new WebTorrent();
+            addMessage("Инициация P2P загрузки...");
+            client.add(magnet, (torrent) => {
+                torrent.files[0].getBlobURL((err, url) => {
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = torrent.files[0].name;
+                    a.click();
+                    addMessage("Файл успешно загружен из Mesh-сети.");
+                });
+            });
+        }
+    </script>
+</body>
+</html>
