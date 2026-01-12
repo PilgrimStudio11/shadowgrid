@@ -3,79 +3,169 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ShadowGrid // Beacon</title>
-    <!-- CDN 2026 года -->
+    <title>ShadowGrid // Decentralized Future</title>
+    
+    <!-- P2P Stack 2026 -->
     <script src="cdn.jsdelivr.net"></script>
     <script src="cdn.jsdelivr.net"></script>
     <script src="cdn.jsdelivr.net"></script>
+
     <style>
-        :root { --bg: #0e1621; --chat: #17212b; --text: #f5f5f5; --accent: #2481cc; --hint: #708499; }
-        body { background: var(--bg); color: var(--text); font-family: sans-serif; margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-        .tg-container { width: 100%; max-width: 400px; background: var(--chat); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); overflow: hidden; margin: 10px; }
-        .header { padding: 15px; background: var(--chat); border-bottom: 1px solid #000; text-align: center; color: var(--accent); font-weight: bold; }
-        .section { padding: 20px; border-bottom: 1px solid #232e3c; }
-        .section h3 { margin: 0 0 10px 0; font-size: 16px; color: var(--accent); }
-        .section p { margin: 0; font-size: 13px; color: var(--hint); }
-        .dl-area { padding: 20px; background: var(--bg); text-align: center; }
-        .btn-dl { background: var(--accent); color: #fff; border: none; width: 100%; padding: 15px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        :root {
+            --bg: #0e1621;
+            --chat-bg: #17212b;
+            --text: #f5f5f5;
+            --accent: #2481cc;
+            --hint: #708499;
+            --success: #34c759;
+            --card-bg: #1e2c3a;
+        }
+        body { background: var(--bg); color: var(--text); font-family: -apple-system, system-ui, sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        
+        .container { width: 100%; max-width: 600px; background: var(--chat-bg); border-radius: 15px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+        
+        /* Header */
+        .header { padding: 20px; background: var(--card-bg); text-align: center; border-bottom: 1px solid #000; }
+        .header h1 { margin: 0; font-size: 22px; color: var(--accent); }
+        .status { font-size: 11px; margin-top: 5px; color: var(--success); text-transform: uppercase; letter-spacing: 1px; }
+
+        /* Content */
+        .content { padding: 20px; }
+        .post { background: var(--card-bg); padding: 15px; border-radius: 12px; margin-bottom: 20px; position: relative; }
+        .post::before { content: ''; position: absolute; left: -5px; top: 20px; border-style: solid; border-width: 10px 10px 10px 0; border-color: transparent var(--card-bg) transparent transparent; }
+        
+        h2 { font-size: 18px; color: var(--accent); margin-top: 0; }
+        p { font-size: 14px; line-height: 1.5; color: #e1e1e1; }
+        ul { padding-left: 20px; font-size: 14px; color: var(--hint); }
+        li { margin-bottom: 8px; }
+
+        /* Roadmap */
+        .roadmap { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
+        .step { display: flex; align-items: center; gap: 10px; font-size: 13px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 8px; }
+        .step.done { border-left: 3px solid var(--success); }
+        .step.next { border-left: 3px solid var(--accent); }
+
+        /* Action Area */
+        .download-zone { padding: 25px; background: var(--bg); text-align: center; border-top: 1px solid #232e3c; }
+        .btn-dl { background: var(--accent); color: white; border: none; width: 100%; padding: 18px; border-radius: 12px; font-weight: bold; cursor: pointer; transition: 0.3s; font-size: 15px; }
+        .btn-dl:hover { background: #288fde; }
         .btn-dl:disabled { background: #2c3b4a; color: var(--hint); cursor: not-allowed; }
-        #status { font-size: 11px; margin-top: 10px; color: #52fb5a; }
+
+        #console { font-family: 'Consolas', monospace; font-size: 10px; color: var(--hint); margin-top: 15px; text-align: left; background: #000; padding: 10px; border-radius: 5px; height: 50px; overflow: hidden; }
     </style>
 </head>
 <body>
 
-<div class="tg-container">
-    <div class="header">SHADOWGRID // 2026</div>
-    
-    <div class="section">
-        <h3>Для пользователей</h3>
-        <p>Децентрализованный доступ к Mesh-сетям и dVPN. Никаких блокировок.</p>
+<div class="container">
+    <div class="header">
+        <h1>SHADOWGRID // GLOBAL BEACON</h1>
+        <div class="status" id="p2p-status">MESH_NETWORK: INITIALIZING...</div>
     </div>
 
-    <div class="section">
-        <h3>Для инвесторов</h3>
-        <p>Монетизация мощностей через PoUW. Ваш Хаб приносит доход.</p>
+    <div class="content">
+        <!-- Блок 1: Описание -->
+        <div class="post">
+            <h2>О проекте</h2>
+            <p>ShadowGrid (2026) — это DePIN-инфраструктура нового поколения. Мы объединили Mesh-сети и рынок вычислений, чтобы создать интернет, который невозможно подвергнуть цензуре или отключить.</p>
+            <ul>
+                <li><b>Анонимность:</b> Полное отсутствие центральных серверов.</li>
+                <li><b>Живучесть:</b> Работает через Wi-Fi/Bluetooth соседей даже без интернета.</li>
+                <li><b>Доход:</b> Ваш Хаб сдает мощность под ИИ-задачи (PoUW), пока вы спите.</li>
+            </ul>
+        </div>
+
+        <!-- Блок 2: Инвесторам -->
+        <div class="post">
+            <h2>Инвестиционная привлекательность</h2>
+            <p>В 2026 году данные и вычислительные мощности — это новая нефть. ShadowGrid монетизирует каждый узел сети:</p>
+            <ul>
+                <li>Масштабируемость: Каждый новый пользователь расширяет сеть, а не нагружает её.</li>
+                <li>Токенизация: Награды за полезную работу (Proof of Useful Work).</li>
+                <li>Рынок: Спрос на децентрализованный ИИ-рендеринг вырос на 400%.</li>
+            </ul>
+        </div>
+
+        <!-- Блок 3: Дорожная карта -->
+        <div class="post">
+            <h2>Roadmap 2026</h2>
+            <div class="roadmap">
+                <div class="step done">✅ Q1: Запуск Генезис-Маяков и протокола связи.</div>
+                <div class="step next">🔵 Q2: Внедрение ИИ-майнинга (PoUW) в Хабы.</div>
+                <div class="step">⚪ Q3: Мобильные Mesh-узлы (iOS/Android).</div>
+                <div class="step">⚪ Q4: Полная автономность от глобального IP.</div>
+            </div>
+        </div>
     </div>
 
-    <div class="dl-area">
-        <div id="msg" style="font-size: 14px; margin-bottom: 15px;">Ожидание сигнала Архитектора...</div>
-        <button id="dl-btn" class="btn-dl" disabled>ПРОВЕРКА ПОДПИСИ...</button>
-        <div id="status">P2P: READY</div>
+    <!-- Зона загрузки -->
+    <div class="download-zone">
+        <div id="main-msg" style="font-size: 14px; margin-bottom: 15px; font-weight: 500;">Ожидание сигнала Архитектора...</div>
+        <button id="dl-btn" class="btn-dl" disabled>ПРОВЕРКА СИГНАЛА...</button>
+        <p style="font-size: 11px; color: var(--hint); margin-top: 10px;">Файл будет доставлен через P2P Grid напрямую от участников сети.</p>
+        <div id="console">System boot...</div>
     </div>
 </div>
 
 <script>
-    // ВСТАВЬТЕ ВАШ MASTER_ID ИЗ АДМИНКИ СЮДА
-    const ARCHITECT_PUB = "ВАШ_ПУБЛИЧНЫЙ_КЛЮЧ_ПОСЛЕ_ГЕНЕЗИСА"; 
-    
-    // Инициализация GunDB
-    const gun = Gun(['gun-manhattan.herokuapp.com']);
+    const log = (t) => { document.getElementById('console').innerText = "> " + t; };
 
-    gun.get('shadowgrid').get('signal').on(async (data) => {
-        if (!data) return;
+    async function init() {
         try {
-            // Проверка цифровой подписи (Логика 2026)
-            const verified = await Gun.SEA.verify(data, ARCHITECT_PUB);
-            
-            if (verified) {
-                document.getElementById('msg').innerText = "СИГНАЛ ВЕРИФИЦИРОВАН";
-                const btn = document.getElementById('dl-btn');
-                btn.innerText = "СКАЧАТЬ ХАБ (.EXE)";
-                btn.disabled = false;
-                btn.onclick = () => {
-                    const client = new WebTorrent();
-                    client.add(verified.magnet, (torrent) => {
-                        torrent.files[0].getBlobURL((err, url) => {
-                            const a = document.createElement('a');
-                            a.href = url;
-                            a.download = "ShadowHub_2026.exe";
-                            a.click();
-                        });
-                    });
-                };
+            // 1. Автоматическое получение ключа от сервера (через ваше рукопожатие)
+            const response = await fetch('/api/get_key');
+            const data = await response.json();
+            const MASTER_KEY = data.pub_key;
+
+            if (!MASTER_KEY) {
+                document.getElementById('main-msg').innerText = "МАЯК НЕ АКТИВИРОВАН АРХИТЕКТОРОМ";
+                log("Awaiting Handshake from Admin app...");
+                return;
             }
-        } catch (e) { console.error("Crypto error:", e); }
-    });
+
+            log("Master Key verified. Connecting to GunDB...");
+            document.getElementById('p2p-status').innerText = "MESH_NETWORK: ONLINE";
+
+            // 2. Подключение к сети
+            const gun = Gun(['gun-manhattan.herokuapp.com']);
+            
+            // 3. Ожидание подписанного сигнала
+            gun.get('shadowgrid').get('signal').on(async (signalData) => {
+                if (!signalData) return;
+                
+                // Крипто-проверка подписи Архитектора
+                const verified = await Gun.SEA.verify(signalData, MASTER_KEY);
+                
+                if (verified) {
+                    log("Signature Valid. Magnet link received.");
+                    document.getElementById('main-msg').innerText = "СИГНАЛ ВЕРИФИЦИРОВАН. СЕТЬ ДОСТУПНА.";
+                    document.getElementById('main-msg').style.color = "var(--success)";
+                    
+                    const btn = document.getElementById('dl-btn');
+                    btn.innerText = "СКАЧАТЬ АВТОНОМНЫЙ ХАБ (.EXE)";
+                    btn.disabled = false;
+                    
+                    btn.onclick = () => {
+                        const client = new WebTorrent();
+                        log("Starting P2P download from Grid...");
+                        client.add(verified.msg.magnet, (torrent) => {
+                            const file = torrent.files.find(f => f.name.endsWith('.exe'));
+                            file.getBlobURL((err, url) => {
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = file.name;
+                                a.click();
+                                log("Download complete.");
+                            });
+                        });
+                    };
+                }
+            });
+        } catch (e) {
+            log("Error: " + e.message);
+        }
+    }
+
+    window.onload = init;
 </script>
 </body>
 </html>
