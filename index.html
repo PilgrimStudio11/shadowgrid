@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ShadowGrid Beacon</title>
+    <title>ShadowGrid | Decentralized Infrastructure</title>
     <script src="cdn.jsdelivr.net"></script>
     <script src="cdn.jsdelivr.net"></script>
     <script src="cdn.jsdelivr.net"></script>
@@ -14,84 +14,98 @@
             --tg-text: #f5f5f5;
             --tg-hint: #708499;
             --tg-button: #2481cc;
-            --tg-button-text: #ffffff;
             --tg-accent: #64b5ef;
         }
-        body { background-color: var(--tg-sec-bg); color: var(--tg-text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; }
-        .tg-container { width: 100%; max-width: 400px; background: var(--tg-bg); border-radius: 0; height: 100vh; display: flex; flex-direction: column; }
-        @media (min-width: 450px) { .tg-container { height: 600px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); } }
-        .header { padding: 15px; background: var(--tg-bg); border-bottom: 1px solid #000; text-align: center; }
-        .header h1 { font-size: 18px; margin: 0; color: var(--tg-accent); }
-        .chat-area { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
-        .msg { background: var(--tg-sec-bg); padding: 12px; border-radius: 12px; max-width: 85%; font-size: 14px; position: relative; line-height: 1.4; border-bottom-left-radius: 2px; }
-        .msg-time { font-size: 10px; color: var(--tg-hint); text-align: right; margin-top: 5px; }
-        .footer { padding: 20px; background: var(--tg-bg); border-top: 1px solid #000; }
-        .btn-dl { background: var(--tg-button); color: var(--tg-button-text); border: none; width: 100%; padding: 14px; border-radius: 10px; font-weight: 600; cursor: pointer; transition: 0.2s; text-transform: uppercase; font-size: 13px; }
-        .btn-dl:disabled { background: #2c3b4a; color: var(--tg-hint); cursor: not-allowed; }
+        body { background: var(--tg-sec-bg); color: var(--tg-text); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; line-height: 1.6; }
+        
+        /* Стили Лендинга */
+        .hero { padding: 60px 20px; text-align: center; background: linear-gradient(180deg, var(--tg-bg) 0%, var(--tg-sec-bg) 100%); }
+        .hero h1 { color: var(--tg-accent); font-size: 2.5em; margin-bottom: 10px; }
+        .hero p { color: var(--tg-hint); max-width: 600px; margin: 0 auto; }
+
+        .section { padding: 40px 20px; max-width: 800px; margin: 0 auto; }
+        .grid-info { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 30px; }
+        .card { background: var(--tg-bg); padding: 20px; border-radius: 12px; border: 1px solid #232e3c; }
+        .card h3 { margin-top: 0; color: var(--tg-accent); }
+
+        /* Секция Загрузки (Telegram Style) */
+        .tg-box { background: var(--tg-bg); border-radius: 15px; max-width: 400px; margin: 40px auto; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .tg-header { padding: 15px; background: #232e3c; text-align: center; font-weight: bold; }
+        .tg-body { padding: 20px; min-height: 100px; text-align: center; }
         .status-dot { height: 8px; width: 8px; background-color: #52fb5a; border-radius: 50%; display: inline-block; margin-right: 5px; }
+
+        .btn-dl { background: var(--tg-button); color: white; border: none; width: 100%; padding: 15px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .btn-dl:disabled { background: #2c3b4a; color: var(--tg-hint); cursor: not-allowed; }
+        
+        .badge { background: rgba(100, 181, 239, 0.1); color: var(--tg-accent); padding: 4px 10px; border-radius: 5px; font-size: 12px; }
     </style>
 </head>
 <body>
-    <div class="tg-container">
-        <div class="header">
-            <h1>ShadowGrid // Маяк</h1>
-            <div style="font-size: 10px; color: var(--tg-hint);"><span class="status-dot"></span> СЕТЬ АКТИВНА</div>
+
+<div class="hero">
+    <h1>SHADOWGRID <span style="font-size: 12px; vertical-align: middle;" class="badge">v2026.1</span></h1>
+    <p>Инфраструктура абсолютной живучести. Mesh-сети, P2P-связь и рынок вычислений, которые невозможно отключить.</p>
+</div>
+
+<div class="section">
+    <div class="grid-info">
+        <div class="card">
+            <h3>Пользователям</h3>
+            <p>Ваш личный Хаб становится шлюзом в свободный интернет. Используйте dVPN, общайтесь по зашифрованным Mesh-каналам и храните данные децентрализованно.</p>
         </div>
-        <div class="chat-area" id="chat">
-            <div class="msg">
-                Добро пожаловать в ShadowGrid. Это децентрализованный канал вещания Архитектора.
-                <div class="msg-time">09:00</div>
-            </div>
-            <div class="msg">
-                Ожидание каноничного сигнала от MASTER_ID...
-                <div class="msg-time">09:01</div>
-            </div>
-        </div>
-        <div class="footer">
-            <button id="dl-btn" class="btn-dl" disabled>Сигнал не обнаружен</button>
-            <div id="p2p-status" style="font-size: 10px; color: var(--tg-hint); text-align: center; margin-top: 10px;">P2P: CONNECTING...</div>
+        <div class="card">
+            <h3>Инвесторам</h3>
+            <p>ShadowGrid внедряет PoUW (Proof of Useful Work). Каждый узел монетизирует свою мощность, обучая ИИ-модели, обеспечивая стабильный доход владельцу и рост экосистемы.</p>
         </div>
     </div>
+</div>
 
-    <script>
-        const ARCHITECT_PUB = "ВАШ_ПУБЛИЧНЫЙ_КЛЮЧ_ИЗ_АДМИНКИ"; 
-        const gun = Gun(['gun-manhattan.herokuapp.com']);
+<div class="tg-box">
+    <div class="tg-header">
+        <span class="status-dot"></span> BEACON_ACTIVE
+    </div>
+    <div class="tg-body">
+        <div id="status-text" style="margin-bottom: 20px; font-size: 14px;">Ожидание цифровой подписи Архитектора...</div>
+        <button id="dl-btn" class="btn-dl" disabled>ПРОВЕРКА СИГНАЛА...</button>
+        <p style="font-size: 11px; color: var(--tg-hint); margin-top: 15px;">Только каноничный билд, подписанный ключом Ed25519.</p>
+    </div>
+</div>
+
+<script>
+    // ВАЖНО: После первого рукопожатия вставьте сюда ваш Public Key
+    const ARCHITECT_PUB = "ВАШ_ПУБЛИЧНЫЙ_КЛЮЧ_ИЗ_АДМИНКИ"; 
+    const gun = Gun(['gun-manhattan.herokuapp.com']);
+    
+    gun.get('shadowgrid').get('signal').on(async (data) => {
+        if (!data) return;
         
-        gun.get('shadowgrid').get('signal').on(async (data) => {
-            if (!data) return;
-            const isVerified = await Gun.SEA.verify(data.signed_hash, ARCHITECT_PUB);
-            
-            if (isVerified) {
-                addMessage("Сигнал подтвержден. Доступно обновление ПО.");
-                const btn = document.getElementById('dl-btn');
-                btn.innerText = "Скачать Хаб (v.2026.1)";
-                btn.disabled = false;
-                btn.onclick = () => startP2P(data.magnet);
-            }
-        });
-
-        function addMessage(text) {
-            const chat = document.getElementById('chat');
-            const div = document.createElement('div');
-            div.className = 'msg';
-            div.innerHTML = `${text}<div class="msg-time">${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>`;
-            chat.appendChild(div);
-            chat.scrollTop = chat.scrollHeight;
+        // В 2026 проверяем подпись через встроенный модуль SEA
+        const isVerified = await Gun.SEA.verify(data.signed_hash, ARCHITECT_PUB);
+        
+        if (isVerified) {
+            document.getElementById('status-text').innerText = "СИГНАЛ ПОДТВЕРЖДЕН. СКАЧИВАНИЕ ДОСТУПНО.";
+            const btn = document.getElementById('dl-btn');
+            btn.innerText = "СКАЧАТЬ SHADOW_HUB.EXE";
+            btn.disabled = false;
+            btn.onclick = () => startP2P(data.magnet);
         }
+    });
 
-        function startP2P(magnet) {
-            const client = new WebTorrent();
-            addMessage("Инициация P2P загрузки...");
-            client.add(magnet, (torrent) => {
-                torrent.files[0].getBlobURL((err, url) => {
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = torrent.files[0].name;
-                    a.click();
-                    addMessage("Файл успешно загружен из Mesh-сети.");
-                });
+    function startP2P(magnet) {
+        const client = new WebTorrent();
+        document.getElementById('status-text').innerText = "Инициация P2P-потока...";
+        client.add(magnet, (torrent) => {
+            const file = torrent.files.find(f => f.name.endsWith('.exe'));
+            file.getBlobURL((err, url) => {
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = file.name;
+                a.click();
+                document.getElementById('status-text').innerText = "Файл получен через Grid.";
             });
-        }
-    </script>
+        });
+    }
+</script>
+
 </body>
 </html>
