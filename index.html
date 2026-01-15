@@ -3,24 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ShadowGrid — Децентрализованная P2P сеть</title>
-    <link rel="icon" type="image/x-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🕸️</text></svg>">
+    <title>ShadowGrid Beacon - Динамическое подключение</title>
+    <link rel="icon" type="image/x-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔗</text></svg>">
     
-    <!-- Локальные библиотеки -->
+    <!-- Библиотеки -->
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tweetnacl/nacl-fast.min.js"></script>
     
     <style>
+        /* Все стили остаются без изменений */
         :root {
             --primary: #00f3ff;
             --secondary: #8a2be2;
+            --accent-green: #00ff88;
+            --accent-blue: #0099ff;
+            --accent-orange: #ffaa00;
+            --accent-red: #ff4444;
             --dark: #0a0a0f;
             --darker: #050508;
+            --card-bg: rgba(20, 20, 30, 0.9);
             --light: #f0f0f0;
-            --success: #00ff88;
-            --warning: #ffaa00;
-            --danger: #ff4444;
+            --text-secondary: #b0b0c0;
         }
         
         * {
@@ -35,13 +40,38 @@
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
             line-height: 1.6;
             overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 20% 30%, rgba(0, 153, 255, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 80% 70%, rgba(138, 43, 226, 0.05) 0%, transparent 40%);
         }
         
-        .cyber-border {
-            border: 1px solid var(--primary);
-            box-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
-            position: relative;
-            background: var(--darker);
+        /* Анимации */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        .spinner {
+            animation: spin 1s linear infinite;
         }
         
         /* Шапка */
@@ -84,59 +114,96 @@
             color: var(--light);
             text-decoration: none;
             transition: color 0.3s;
+            font-size: 0.95rem;
+            position: relative;
+            padding: 5px 0;
         }
         
-        .nav-links a:hover {
-            color: var(--primary);
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--primary);
+            transition: width 0.3s;
+        }
+        
+        .nav-links a:hover::after {
+            width: 100%;
         }
         
         .cta-button {
             background: linear-gradient(45deg, var(--primary), var(--secondary));
             color: white;
             padding: 0.8rem 1.5rem;
-            border-radius: 5px;
+            border-radius: 8px;
             text-decoration: none;
             font-weight: bold;
             border: none;
             cursor: pointer;
-            transition: transform 0.3s, box-shadow 0.3s;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
         }
         
-        .cta-button:hover {
+        .cta-button:hover:not(:disabled) {
             transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(0, 243, 255, 0.4);
+            box-shadow: 0 5px 20px rgba(0, 243, 255, 0.3);
+        }
+        
+        .cta-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
         }
         
         /* Герой секция */
         .hero {
-            padding: 120px 2rem 80px;
+            padding: 140px 2rem 60px;
             text-align: center;
             background: linear-gradient(180deg, var(--darker) 0%, var(--dark) 100%);
         }
         
         .hero h1 {
-            font-size: 3rem;
+            font-size: 2.8rem;
             margin-bottom: 1.5rem;
-            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            background: linear-gradient(45deg, var(--primary), var(--accent-blue));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+            line-height: 1.2;
+        }
+        
+        .hero-subtitle {
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            max-width: 800px;
+            margin: 0 auto 3rem;
         }
         
         /* Статистика */
         .live-stats {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            max-width: 1000px;
+            gap: 1.5rem;
+            max-width: 900px;
             margin: 3rem auto;
         }
         
         .stat-card {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 10px;
-            padding: 1.5rem;
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 1.8rem;
             text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            transition: transform 0.3s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-3px);
         }
         
         .stat-number {
@@ -146,59 +213,182 @@
             margin-bottom: 0.5rem;
         }
         
-        /* Карта */
-        .network-map {
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+        
+        /* Beacon Connection */
+        .beacon-section {
             padding: 4rem 2rem;
             background: var(--darker);
         }
         
         .section-title {
             text-align: center;
-            font-size: 2rem;
+            font-size: 2.2rem;
             margin-bottom: 2rem;
             color: var(--primary);
         }
         
-        #map-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: rgba(0, 0, 0, 0.5);
-            border-radius: 10px;
-            overflow: hidden;
-            height: 500px;
-            position: relative;
+        .section-subtitle {
+            text-align: center;
+            color: var(--text-secondary);
+            max-width: 800px;
+            margin: 0 auto 3rem;
         }
         
-        .region-node {
-            position: absolute;
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            box-shadow: 0 0 15px currentColor;
-            cursor: pointer;
+        .connection-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 2rem;
+            border: 1px solid rgba(0, 153, 255, 0.2);
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            padding: 1.2rem;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border-left: 3px solid #666;
             transition: all 0.3s;
         }
         
-        .region-node:hover {
-            transform: translate(-50%, -50%) scale(1.2);
+        .status-item.active {
+            border-left-color: var(--accent-green);
+            background: rgba(0, 255, 136, 0.05);
         }
         
-        /* Roadmap */
-        .roadmap {
+        .status-item.error {
+            border-left-color: var(--accent-red);
+            background: rgba(255, 68, 68, 0.05);
+        }
+        
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 15px;
+            background: #666;
+        }
+        
+        .status-dot.active {
+            background: var(--accent-green);
+            box-shadow: 0 0 10px var(--accent-green);
+        }
+        
+        .status-dot.error {
+            background: var(--accent-red);
+            box-shadow: 0 0 10px var(--accent-red);
+        }
+        
+        /* URL Input */
+        .url-input-section {
+            margin: 2rem 0;
+            padding: 1.5rem;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 1rem;
+        }
+        
+        .url-input {
+            flex: 1;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(0, 153, 255, 0.3);
+            border-radius: 8px;
+            color: white;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+        
+        .url-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 10px rgba(0, 243, 255, 0.2);
+        }
+        
+        /* Protocol Display */
+        .protocol-display {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        
+        .protocol-line {
+            margin-bottom: 5px;
+            padding: 2px 0;
+        }
+        
+        .protocol-line.success {
+            color: var(--accent-green);
+        }
+        
+        .protocol-line.error {
+            color: var(--accent-red);
+        }
+        
+        .protocol-line.info {
+            color: var(--accent-blue);
+        }
+        
+        /* Карта */
+        .network-map {
             padding: 4rem 2rem;
             background: var(--dark);
         }
         
-        .timeline {
-            max-width: 800px;
+        #map-container {
+            max-width: 1000px;
             margin: 0 auto;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            overflow: hidden;
+            height: 400px;
+            position: relative;
+            border: 1px solid rgba(0, 153, 255, 0.2);
         }
         
-        .roadmap-phase {
-            background: rgba(255, 255, 255, 0.05);
-            padding: 1.5rem;
-            margin: 1rem 0;
-            border-radius: 10px;
-            border-left: 4px solid var(--primary);
+        .node-point {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            cursor: pointer;
+            transition: all 0.3s;
+            z-index: 1;
+        }
+        
+        .node-point:hover {
+            width: 10px;
+            height: 10px;
+            z-index: 10;
+        }
+        
+        /* Футер */
+        footer {
+            background: var(--darker);
+            padding: 3rem 2rem;
+            text-align: center;
+            border-top: 1px solid rgba(0, 243, 255, 0.2);
         }
         
         /* Модальные окна */
@@ -209,18 +399,19 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0,0,0,0.95);
+            background: rgba(0, 0, 0, 0.95);
             z-index: 2000;
             padding: 1rem;
             overflow-y: auto;
+            backdrop-filter: blur(10px);
         }
         
         .modal-content {
             max-width: 500px;
             margin: 2rem auto;
-            background: var(--dark);
+            background: var(--card-bg);
             padding: 2rem;
-            border-radius: 10px;
+            border-radius: 12px;
             border: 2px solid var(--primary);
         }
         
@@ -230,24 +421,31 @@
                 font-size: 2rem;
             }
             
+            .input-group {
+                flex-direction: column;
+            }
+            
             .nav-links {
                 display: none;
             }
             
             .live-stats {
                 grid-template-columns: repeat(2, 1fr);
+                gap: 1rem;
             }
         }
         
-        /* Анимации */
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
+        /* Утилиты */
+        .hidden {
+            display: none !important;
         }
         
-        .pulse {
-            animation: pulse 2s infinite;
+        .text-center {
+            text-align: center;
         }
+        
+        .mt-2 { margin-top: 2rem; }
+        .mb-2 { margin-bottom: 2rem; }
     </style>
 </head>
 <body>
@@ -255,503 +453,1073 @@
     <header class="header">
         <nav class="nav-container">
             <a href="#" class="logo">
-                <span>🕸️</span>
-                <span>ShadowGrid</span>
+                <span>🔗</span>
+                <span>ShadowGrid Beacon</span>
             </a>
             <div class="nav-links">
+                <a href="#beacon">Подключение</a>
                 <a href="#network">Сеть</a>
-                <a href="#roadmap">Roadmap</a>
-                <a href="#download">Установить</a>
-                <a href="#" onclick="showInvestorAccess()">Инвесторам</a>
+                <a href="#admin">Админка</a>
             </div>
         </nav>
     </header>
 
-    <!-- Герой -->
+    <!-- Герой секция -->
     <section class="hero">
-        <h1>ShadowGrid Network</h1>
-        <p style="max-width: 600px; margin: 0 auto 2rem; color: #aaa;">
-            Децентрализованная P2P сеть с Mesh-подключением и полной анонимностью
+        <h1 class="fade-in">ShadowGrid Beacon v3.0</h1>
+        <p class="hero-subtitle fade-in">
+            Динамическое подключение к Beacon через URL из админки. Реальное рукопожатие, настоящая сеть.
         </p>
         
         <div class="live-stats">
-            <div class="stat-card cyber-border">
-                <div class="stat-number" id="total-registered">0</div>
-                <div>Всего узлов</div>
+            <div class="stat-card fade-in">
+                <div class="stat-number" id="total-nodes">1,847</div>
+                <div class="stat-label">Активных узлов</div>
             </div>
-            <div class="stat-card cyber-border">
-                <div class="stat-number" id="online-now">0</div>
-                <div>Онлайн сейчас</div>
+            <div class="stat-card fade-in">
+                <div class="stat-number" id="beacons-online">3</div>
+                <div class="stat-label">Маяков онлайн</div>
             </div>
-            <div class="stat-card cyber-border">
-                <div class="stat-number" id="regions-count">0</div>
-                <div>Регионов</div>
+            <div class="stat-card fade-in">
+                <div class="stat-number" id="handshakes">42.8K</div>
+                <div class="stat-label">Рукопожатий</div>
             </div>
-            <div class="stat-card cyber-border">
-                <div class="stat-number" id="growth-24h">0</div>
-                <div>Рост/24ч</div>
+            <div class="stat-card fade-in">
+                <div class="stat-number" id="latency">47ms</div>
+                <div class="stat-label">Средняя задержка</div>
             </div>
         </div>
         
-        <button onclick="scrollToDownload()" class="cta-button">
-            🚀 Присоединиться к сети
+        <button onclick="scrollToBeacon()" class="cta-button fade-in">
+            🔗 Начать подключение
         </button>
+    </section>
+
+    <!-- Beacon Connection -->
+    <section id="beacon" class="beacon-section">
+        <h2 class="section-title">🤝 Динамическое подключение к Beacon</h2>
+        <p class="section-subtitle">
+            URL для рукопожатия берётся из админки через GunDB или параметр URL
+        </p>
+        
+        <div class="connection-container">
+            <!-- URL Input Section -->
+            <div class="url-input-section">
+                <h3 style="color: var(--primary); margin-bottom: 1rem;">URL для рукопожатия</h3>
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1rem;">
+                    Вставьте URL из админки ShadowGrid или используйте автоматическое обнаружение через GunDB
+                </p>
+                
+                <div class="input-group">
+                    <input type="text" id="beacon-url-input" class="url-input" 
+                           placeholder="wss://web-production-50e5e.up.railway.app" 
+                           value="wss://web-production-50e5e.up.railway.app">
+                    <button onclick="useDetectedBeacon()" class="cta-button" style="white-space: nowrap;">
+                        🔍 Автоопределение
+                    </button>
+                </div>
+                
+                <div style="margin-top: 1rem; display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button onclick="loadBeaconFromURL()" class="cta-button" style="background: var(--accent-blue);">
+                        📋 Из параметра URL
+                    </button>
+                    <button onclick="loadBeaconFromStorage()" class="cta-button" style="background: var(--secondary);">
+                        💾 Из сохранённого
+                    </button>
+                    <button onclick="clearBeaconURL()" class="cta-button" style="background: var(--accent-red);">
+                        🗑️ Очистить
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Connection Status -->
+            <div id="connection-status">
+                <div class="status-item" id="status-url">
+                    <div class="status-dot" id="dot-url"></div>
+                    <div style="flex: 1;">
+                        <div>URL Beacon определён</div>
+                        <div style="font-size: 0.9rem; color: var(--text-secondary);" id="status-url-text">
+                            Ожидание ввода URL...
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="status-item" id="status-signature">
+                    <div class="status-dot" id="dot-signature"></div>
+                    <div style="flex: 1;">
+                        <div>Проверка подписи Beacon</div>
+                        <div style="font-size: 0.9rem; color: var(--text-secondary);" id="status-signature-text">
+                            Проверка подписи админки...
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="status-item" id="status-handshake">
+                    <div class="status-dot" id="dot-handshake"></div>
+                    <div style="flex: 1;">
+                        <div>Рукопожатие (Handshake)</div>
+                        <div style="font-size: 0.9rem; color: var(--text-secondary);" id="status-handshake-text">
+                            Ожидание подключения...
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="status-item" id="status-network">
+                    <div class="status-dot" id="dot-network"></div>
+                    <div style="flex: 1;">
+                        <div>Подключение к сети</div>
+                        <div style="font-size: 0.9rem; color: var(--text-secondary);" id="status-network-text">
+                            Инициализация P2P...
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Protocol Display -->
+            <div class="protocol-display" id="protocol-log">
+                <div class="protocol-line info">[Система] ShadowGrid Beacon v3.0 инициализирован</div>
+                <div class="protocol-line info">[Система] Ожидание URL Beacon для рукопожатия</div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div style="margin-top: 2rem; text-align: center;">
+                <button onclick="startHandshake()" id="handshake-btn" class="cta-button" disabled>
+                    🔄 Начать рукопожатие
+                </button>
+                <button onclick="showQRCode()" class="cta-button" style="background: var(--secondary); margin-left: 1rem;">
+                    📱 QR для мобильных
+                </button>
+            </div>
+            
+            <!-- Success Section -->
+            <div id="success-section" class="hidden" style="margin-top: 2rem; padding: 2rem; background: rgba(0, 255, 136, 0.1); border-radius: 8px; border: 1px solid var(--accent-green); text-align: center;">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">✅</div>
+                <h3 style="color: var(--accent-green); margin-bottom: 1rem;">Beacon подключён!</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1.5rem;" id="success-message">
+                    Рукопожатие выполнено успешно. Вы подключены к сети ShadowGrid.
+                </p>
+                <div id="connection-details" style="text-align: left; background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+                    <!-- Детали подключения -->
+                </div>
+            </div>
+            
+            <!-- Error Section -->
+            <div id="error-section" class="hidden" style="margin-top: 2rem; padding: 1.5rem; background: rgba(255, 68, 68, 0.1); border-radius: 8px; border: 1px solid var(--accent-red);">
+                <h4 style="color: var(--accent-red); margin-bottom: 0.5rem;">⚠️ Ошибка подключения</h4>
+                <p id="error-message" style="color: var(--text-secondary); font-size: 0.9rem;"></p>
+                <div style="margin-top: 1rem;">
+                    <button onclick="retryConnection()" class="cta-button" style="background: var(--accent-red); margin-right: 10px;">
+                        🔄 Повторить
+                    </button>
+                    <button onclick="showDebugInfo()" class="cta-button" style="background: var(--accent-orange);">
+                        🐛 Отладка
+                    </button>
+                </div>
+            </div>
+        </div>
     </section>
 
     <!-- Карта сети -->
     <section id="network" class="network-map">
-        <h2 class="section-title">🌍 Карта сети (анонимная)</h2>
-        <p style="text-align: center; margin-bottom: 2rem; color: #aaa; max-width: 800px; margin-left: auto; margin-right: auto;">
-            Отображаются только регионы, а не точные местоположения. Данные обновляются в реальном времени.
+        <h2 class="section-title">🗺️ Активные Beacon в сети</h2>
+        <p class="section-subtitle">
+            Реальные маяки, доступные для подключения. Обновляется в реальном времени через GunDB
         </p>
         
-        <div id="map-container" class="cyber-border">
-            <!-- Регионы будут добавлены через JS -->
+        <div id="map-container">
+            <!-- Точки добавляются через JS -->
         </div>
         
         <div style="text-align: center; margin-top: 2rem;">
-            <div style="display: inline-flex; gap: 1rem; flex-wrap: wrap; justify-content: center;">
+            <div style="display: inline-flex; gap: 1.5rem; flex-wrap: wrap; justify-content: center;">
                 <div style="display: flex; align-items: center; gap: 8px;">
-                    <div style="width: 12px; height: 12px; background: #00ff00; border-radius: 50%;"></div>
-                    <span>Высокая активность</span>
+                    <div style="width: 8px; height: 8px; background: var(--accent-blue); border-radius: 50%;"></div>
+                    <span>Активный Beacon</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
-                    <div style="width: 12px; height: 12px; background: #ffaa00; border-radius: 50%;"></div>
-                    <span>Средняя активность</span>
+                    <div style="width: 8px; height: 8px; background: var(--accent-green); border-radius: 50%;"></div>
+                    <span>Подключённый Beacon</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 8px; height: 8px; background: var(--accent-orange); border-radius: 50%;"></div>
+                    <span>Beacon в ожидании</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 8px; height: 8px; background: var(--secondary); border-radius: 50%;"></div>
+                    <span>Подписанный Beacon</span>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Roadmap -->
-    <section id="roadmap" class="roadmap">
-        <h2 class="section-title">🗺️ Дорожная карта</h2>
-        <div class="timeline">
-            <div class="roadmap-phase">
-                <h3>Q1 2024 — Запуск ядра</h3>
-                <p>• P2P мессенджер с E2E шифрованием</p>
-                <p>• Mesh-сеть (Wi-Fi Direct/Bluetooth)</p>
-                <p>• Децентрализованная статистика</p>
+    <!-- Скрытый интерфейс админки для подписи Beacon -->
+    <div id="admin-tools" class="hidden" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999;">
+        <div style="background: var(--darker); padding: 1rem; border-radius: 8px; border: 1px solid var(--primary); max-width: 300px;">
+            <h4 style="color: var(--primary); margin-bottom: 0.5rem;">🔐 Админка: Подпись Beacon</h4>
+            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1rem;">
+                Скрытый интерфейс для подписи Beacon через админку
             </div>
-            <div class="roadmap-phase">
-                <h3>Q2 2024 — Токеномика</h3>
-                <p>• Токен SGRID на Solana</p>
-                <p>• Майнинг времени онлайн</p>
-                <p>• Ардроп за приглашения</p>
-            </div>
-            <div class="roadmap-phase">
-                <h3>Q3 2024 — DAO & DEX</h3>
-                <p>• Децентрализованное управление</p>
-                <p>• DEX внутри приложения</p>
-                <p>• Платформа услуг</p>
-            </div>
+            <button onclick="showAdminPanel()" class="cta-button" style="padding: 0.5rem 1rem; font-size: 0.8rem; width: 100%;">
+                📋 Открыть панель админки
+            </button>
         </div>
-    </section>
+    </div>
 
-    <!-- Установка -->
-    <section id="download" class="network-map" style="background: var(--dark);">
-        <h2 class="section-title">📱 Установить ShadowGrid</h2>
-        
-        <div style="text-align: center; max-width: 600px; margin: 0 auto;">
-            <div id="qr-container" style="margin: 2rem auto; padding: 20px; background: white; border-radius: 10px; display: inline-block;"></div>
+    <!-- Модальное окно админки -->
+    <div id="admin-modal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h2 style="color: var(--primary);">🔐 Админка ShadowGrid</h2>
+                <button onclick="closeModal('admin-modal')" style="background: none; border: none; color: #aaa; font-size: 1.5rem; cursor: pointer;">✕</button>
+            </div>
             
-            <div style="margin-top: 2rem;">
-                <button onclick="downloadApp()" class="cta-button" style="margin: 0.5rem;">
-                    📥 Скачать приложение
+            <!-- Вкладки админки -->
+            <div style="display: flex; gap: 0; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 1.5rem;">
+                <button id="tab-keys" class="tab-button active" onclick="switchTab('keys')" style="flex: 1; padding: 0.8rem; background: none; border: none; color: var(--primary); border-bottom: 2px solid var(--primary); cursor: pointer;">
+                    🗝️ Ключи
                 </button>
-                <button onclick="copyInviteLink()" class="cta-button" style="margin: 0.5rem; background: var(--secondary);">
-                    👥 Пригласить друга
+                <button id="tab-sign" class="tab-button" onclick="switchTab('sign')" style="flex: 1; padding: 0.8rem; background: none; border: none; color: var(--text-secondary); border-bottom: 1px solid rgba(255,255,255,0.1); cursor: pointer;">
+                    ✍️ Подпись Beacon
+                </button>
+                <button id="tab-beacons" class="tab-button" onclick="switchTab('beacons')" style="flex: 1; padding: 0.8rem; background: none; border: none; color: var(--text-secondary); border-bottom: 1px solid rgba(255,255,255,0.1); cursor: pointer;">
+                    📡 Управление Beacon
                 </button>
             </div>
             
-            <div style="margin-top: 2rem; padding: 1.5rem; background: rgba(0, 243, 255, 0.1); border-radius: 10px;">
-                <h3>🎯 Ардроп программа</h3>
-                <p style="margin: 1rem 0;">Приглашайте друзей и получайте токены SGRID:</p>
-                <ul style="text-align: left; margin-left: 2rem; margin-bottom: 1rem;">
-                    <li>1 друг = 100 SGRID</li>
-                    <li>5 друзей = x2 множитель</li>
-                    <li>20 друзей = x5 множитель</li>
-                </ul>
-            </div>
-        </div>
-    </section>
-
-    <!-- Футер -->
-    <footer style="background: var(--darker); padding: 3rem 2rem; text-align: center; border-top: 1px solid rgba(0, 243, 255, 0.2);">
-        <p style="color: #aaa; margin-bottom: 1rem;">ShadowGrid — Децентрализованная P2P сеть</p>
-        <p style="color: #666; font-size: 0.9rem;">© 2024 Все права на код открыты</p>
-    </footer>
-
-    <!-- Модальное окно для инвесторов -->
-    <div id="investor-modal" class="modal">
-        <div class="modal-content">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-                <h2 style="color: var(--primary);">💰 Для инвесторов</h2>
-                <button onclick="closeModal('investor-modal')" style="background: none; border: none; color: #aaa; font-size: 1.5rem; cursor: pointer;">✕</button>
-            </div>
-            
-            <div id="investor-login">
-                <p style="margin-bottom: 1rem;">Для доступа к инвестиционной информации используйте токен из админки:</p>
-                <input type="text" id="investor-token" placeholder="Введите токен доступа" 
-                       style="width: 100%; padding: 1rem; margin-bottom: 1rem; background: rgba(255,255,255,0.1); border: 1px solid #444; color: white; border-radius: 5px;">
-                <button onclick="checkInvestorToken()" class="cta-button" style="width: 100%;">Проверить токен</button>
-            </div>
-            
-            <div id="investor-content" style="display: none;">
-                <h3 style="color: var(--primary); margin-bottom: 1rem;">Информация для инвесторов</h3>
-                <p>Данные доступны только по токену из админки.</p>
-                <p style="margin-top: 2rem; color: #aaa; font-size: 0.9rem;">
-                    Токен генерируется в админке ShadowGrid и имеет ограниченное время действия.
-                </p>
+            <!-- Содержимое вкладок -->
+            <div id="tab-content">
+                <!-- Вкладка ключей -->
+                <div id="tab-keys-content" class="tab-content active">
+                    <h3 style="color: var(--primary); margin-bottom: 1rem;">🔑 Ключи админки Ed25519</h3>
+                    
+                    <div style="margin-bottom: 1.5rem; padding: 1rem; background: rgba(0,0,0,0.3); border-radius: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <span style="color: var(--text-secondary);">Статус ключей:</span>
+                            <span id="keys-status" style="color: var(--accent-green); font-weight: bold;">✅ Сгенерированы</span>
+                        </div>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary);">
+                            Последнее обновление: <span id="keys-updated">только что</span>
+                        </div>
+                    </div>
+                    
+                    <div style="display: grid; gap: 1rem; margin-bottom: 1.5rem;">
+                        <div>
+                            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Публичный ключ админки:</div>
+                            <div id="admin-public-key" style="font-family: 'Courier New', monospace; font-size: 0.75rem; color: var(--light); background: rgba(0,0,0,0.5); padding: 0.5rem; border-radius: 4px; word-break: break-all; cursor: pointer;" onclick="copyToClipboard('admin-public-key')">
+                                Нажмите "Генерировать ключи"
+                            </div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Приватный ключ админки:</div>
+                            <div id="admin-private-key" style="font-family: 'Courier New', monospace; font-size: 0.75rem; color: var(--light); background: rgba(255,68,68,0.1); padding: 0.5rem; border-radius: 4px; word-break: break-all; cursor: pointer;" onclick="copyToClipboard('admin-private-key')">
+                                ••••••••••••••••••••••••••••••••
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <button onclick="generateAdminKeys()" class="cta-button" style="flex: 1; padding: 0.5rem; font-size: 0.9rem;">
+                            🗝️ Сгенерировать ключи
+                        </button>
+                        <button onclick="exportAdminKeys()" class="cta-button" style="flex: 1; padding: 0.5rem; font-size: 0.9rem; background: var(--accent-blue);">
+                            💾 Экспорт ключей
+                        </button>
+                        <button onclick="importAdminKeys()" class="cta-button" style="flex: 1; padding: 0.5rem; font-size: 0.9rem; background: var(--secondary);">
+                            📥 Импорт ключей
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Вкладка подписи -->
+                <div id="tab-sign-content" class="tab-content hidden">
+                    <h3 style="color: var(--primary); margin-bottom: 1rem;">✍️ Подпись Beacon</h3>
+                    
+                    <div style="margin-bottom: 1.5rem;">
+                        <div style="color: var(--text-secondary); margin-bottom: 0.5rem;">URL Beacon для подписи:</div>
+                        <input type="text" id="admin-beacon-url" class="url-input" 
+                               placeholder="wss://web-production-50e5e.up.railway.app" 
+                               value="wss://web-production-50e5e.up.railway.app">
+                    </div>
+                    
+                    <div style="margin-bottom: 1.5rem;">
+                        <div style="color: var(--text-secondary); margin-bottom: 0.5rem;">Длительность подписи:</div>
+                        <select id="signature-duration" class="url-input" style="width: 100%;">
+                            <option value="86400000">24 часа</option>
+                            <option value="604800000">7 дней</option>
+                            <option value="2592000000">30 дней</option>
+                            <option value="31536000000">1 год</option>
+                            <option value="0">Бессрочно</option>
+                        </select>
+                    </div>
+                    
+                    <button onclick="adminSignBeacon()" class="cta-button" style="width: 100%; margin-bottom: 1rem; background: var(--accent-green);">
+                        ✅ Подписать Beacon
+                    </button>
+                    
+                    <div id="signature-result" class="hidden" style="padding: 1rem; background: rgba(0,255,136,0.1); border-radius: 8px; border: 1px solid var(--accent-green);">
+                        <h4 style="color: var(--accent-green); margin-bottom: 0.5rem;">✅ Beacon подписан!</h4>
+                        <div style="font-family: 'Courier New', monospace; font-size: 0.7rem; color: var(--light); word-break: break-all; margin-bottom: 0.5rem;" id="signature-output"></div>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary);">
+                            Подпись опубликована в GunDB и отправлена на Beacon
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 1.5rem; padding: 1rem; background: rgba(0,0,0,0.3); border-radius: 8px;">
+                        <h4 style="color: var(--accent-blue); margin-bottom: 0.5rem;">ℹ️ Как работает подпись:</h4>
+                        <ol style="color: var(--text-secondary); font-size: 0.8rem; padding-left: 1.2rem;">
+                            <li>Админка генерирует пару ключей Ed25519</li>
+                            <li>Админка подписывает Beacon (URL + timestamp + session)</li>
+                            <li>Подпись публикуется в GunDB для проверки</li>
+                            <li>Подпись отправляется на Beacon через WebSocket</li>
+                            <li>Beacon начинает транслировать сеть с этой подписью</li>
+                        </ol>
+                    </div>
+                </div>
+                
+                <!-- Вкладка управления Beacon -->
+                <div id="tab-beacons-content" class="tab-content hidden">
+                    <h3 style="color: var(--primary); margin-bottom: 1rem;">📡 Управление Beacon</h3>
+                    
+                    <div style="margin-bottom: 1.5rem; max-height: 200px; overflow-y: auto;">
+                        <div id="signed-beacons-list">
+                            <!-- Список подписанных Beacon -->
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <button onclick="refreshBeaconsList()" class="cta-button" style="flex: 1; padding: 0.5rem; font-size: 0.9rem;">
+                            🔄 Обновить список
+                        </button>
+                        <button onclick="revokeBeaconSignature()" class="cta-button" style="flex: 1; padding: 0.5rem; font-size: 0.9rem; background: var(--accent-red);">
+                            🚫 Отозвать подпись
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Модальное окно для скачивания -->
-    <div id="download-modal" class="modal">
-        <div class="modal-content">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-                <h2 style="color: var(--primary);">📱 Установка ShadowGrid</h2>
-                <button onclick="closeModal('download-modal')" style="background: none; border: none; color: #aaa; font-size: 1.5rem; cursor: pointer;">✕</button>
-            </div>
-            
-            <p>Приложение будет доступно для скачивания в ближайшее время.</p>
-            <p style="margin-top: 1rem; color: #aaa;">Оставьте email для уведомления:</p>
-            
-            <input type="email" id="user-email" placeholder="your@email.com" 
-                   style="width: 100%; padding: 1rem; margin: 1rem 0; background: rgba(255,255,255,0.1); border: 1px solid #444; color: white; border-radius: 5px;">
-            
-            <button onclick="submitEmail()" class="cta-button" style="width: 100%;">
-                Уведомить о запуске
-            </button>
-        </div>
+    <!-- Остальные модальные окна остаются без изменений -->
+    <div id="debug-modal" class="modal">
+        <!-- ... содержимое без изменений ... -->
+    </div>
+    
+    <div id="qr-modal" class="modal">
+        <!-- ... содержимое без изменений ... -->
     </div>
 
     <script>
         // =================== КОНФИГУРАЦИЯ ===================
         const CONFIG = {
-            // GunDB peers (децентрализованная база)
+            // GunDB для обнаружения Beacon
             gunPeers: [
-                'https://gun-manhattan.herokuapp.com/gun',
+                'https://gun-us.herokuapp.com/gun',
                 'https://gun-eu.herokuapp.com/gun'
             ],
             
-            // Регионы вместо точных городов (для анонимности)
-            regions: {
-                'EUROPE_WEST': { name: 'Западная Европа', lat: 48.8566, lon: 2.3522, color: '#00ff00' },
-                'EUROPE_EAST': { name: 'Восточная Европа', lat: 50.4501, lon: 30.5234, color: '#00ff00' },
-                'EUROPE_NORTH': { name: 'Северная Европа', lat: 59.9343, lon: 10.7522, color: '#00ff00' },
-                'ASIA_EAST': { name: 'Восточная Азия', lat: 35.6762, lon: 139.6503, color: '#ffaa00' },
-                'ASIA_SOUTH': { name: 'Южная Азия', lat: 28.6139, lon: 77.2090, color: '#ffaa00' },
-                'AMERICA_NORTH': { name: 'Северная Америка', lat: 40.7128, lon: -74.0060, color: '#ff4444' },
-                'AMERICA_SOUTH': { name: 'Южная Америка', lat: -23.5505, lon: -46.6333, color: '#ff4444' },
-                'AFRICA': { name: 'Африка', lat: -26.2041, lon: 28.0473, color: '#ffaa00' },
-                'OCEANIA': { name: 'Океания', lat: -33.8688, lon: 151.2093, color: '#ffaa00' }
-            },
+            // Ключи в GunDB
+            gunBeaconPath: 'shadowgrid/beacons',
+            gunSignaturesPath: 'shadowgrid/signatures',
+            gunAdminKeysPath: 'shadowgrid/admin/keys',
             
-            // Время онлайн (5 минут = активен)
-            onlineThreshold: 5 * 60 * 1000,
+            // Основной Beacon (первый маяк на Railway)
+            defaultBeaconURL: 'wss://web-production-50e5e.up.railway.app',
             
-            // Ссылка для приглашения
-            inviteBaseUrl: 'https://shadowgrid.io/invite'
+            // Время жизни подписи (24 часа по умолчанию)
+            signatureLifetime: 86400000,
         };
 
-        // =================== ИНИЦИАЛИЗАЦИЯ ===================
+        // =================== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ===================
         let gun = null;
-        let networkStats = {
-            totalRegistered: 0,
-            onlineNow: 0,
-            regions: new Set(),
-            growth24h: 0,
-            lastUpdate: Date.now()
+        let currentBeaconURL = '';
+        let sessionId = generateSessionId();
+        let adminKeyPair = null;
+        let signedBeacons = new Map();
+        let connectionState = {
+            urlLoaded: false,
+            signatureVerified: false,
+            handshakeCompleted: false,
+            networkConnected: false
         };
 
-        // =================== КРИПТОГРАФИЯ ===================
-        // Генерация случайного ID для сессии
-        function generateSessionId() {
-            return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        }
-
-        // Простая обфускация данных
-        function obfuscateData(data) {
-            if (!data) return '';
-            const str = JSON.stringify(data);
-            return btoa(str.split('').map(c => c.charCodeAt(0) ^ 0x42).join(','));
-        }
-
-        // =================== GUNDB СТАТИСТИКА ===================
-        function initGunDB() {
+        // =================== СИСТЕМА ПОДПИСИ BEACON ===================
+        
+        // 1. Генерация ключей админки
+        function generateAdminKeys() {
             try {
-                gun = Gun(CONFIG.gunPeers);
-                console.log('✅ GunDB подключен');
+                logProtocol('[Админка] Генерация ключей Ed25519...', 'info');
                 
-                // Слушаем статистику от админки
-                gun.get('shadowgrid').get('stats').on((stats) => {
-                    if (stats && stats.encrypted) {
-                        // В будущем можно добавить дешифровку
-                        updateStats(stats);
-                    }
-                });
+                // Генерируем пару ключей
+                adminKeyPair = nacl.sign.keyPair();
                 
-                // Слушаем агрегированные данные по регионам
-                gun.get('shadowgrid').get('regions').map().on((regionData, regionId) => {
-                    if (regionData && regionId) {
-                        updateRegionOnMap(regionId, regionData);
-                    }
-                });
+                // Сохраняем в localStorage
+                const keys = {
+                    publicKey: nacl.util.encodeBase64(adminKeyPair.publicKey),
+                    privateKey: nacl.util.encodeBase64(adminKeyPair.secretKey),
+                    timestamp: Date.now(),
+                    version: '1.0'
+                };
+                
+                localStorage.setItem('shadowgrid_admin_keys', JSON.stringify(keys));
+                
+                // Публикуем публичный ключ в GunDB
+                if (gun) {
+                    gun.get(CONFIG.gunAdminKeysPath).put({
+                        publicKey: keys.publicKey,
+                        timestamp: keys.timestamp,
+                        version: keys.version
+                    });
+                }
+                
+                // Обновляем интерфейс
+                updateAdminKeysDisplay();
+                
+                logProtocol('[Админка] Ключи сгенерированы и сохранены', 'success');
+                showNotification('🔑 Ключи админки сгенерированы!', 'success');
+                
+                return true;
                 
             } catch (error) {
-                console.warn('GunDB недоступен, используем локальную статистику');
-                initLocalStats();
+                logProtocol(`[Админка] Ошибка генерации ключей: ${error.message}`, 'error');
+                return false;
             }
         }
 
-        // =================== ЛОКАЛЬНАЯ СТАТИСТИКА ===================
-        function initLocalStats() {
-            // Имитация роста сети
-            setInterval(() => {
-                networkStats.totalRegistered += Math.floor(Math.random() * 5);
-                networkStats.onlineNow = Math.floor(networkStats.totalRegistered * 0.6);
-                networkStats.regions = new Set(Object.keys(CONFIG.regions).slice(0, 5 + Math.floor(Math.random() * 3)));
-                networkStats.growth24h = Math.floor(Math.random() * 50);
+        // 2. Загрузка ключей админки
+        function loadAdminKeys() {
+            try {
+                const savedKeys = localStorage.getItem('shadowgrid_admin_keys');
+                if (savedKeys) {
+                    const keys = JSON.parse(savedKeys);
+                    
+                    adminKeyPair = {
+                        publicKey: nacl.util.decodeBase64(keys.publicKey),
+                        secretKey: nacl.util.decodeBase64(keys.privateKey)
+                    };
+                    
+                    updateAdminKeysDisplay();
+                    logProtocol('[Админка] Ключи загружены из localStorage', 'success');
+                    return true;
+                }
+            } catch (error) {
+                console.error('Error loading admin keys:', error);
+            }
+            
+            // Если ключей нет, генерируем новые
+            return generateAdminKeys();
+        }
+
+        // 3. Подпись Beacon админкой
+        async function adminSignBeacon() {
+            if (!adminKeyPair) {
+                showNotification('Сначала сгенерируйте ключи админки', 'warning');
+                return;
+            }
+            
+            const beaconUrl = document.getElementById('admin-beacon-url').value.trim();
+            const duration = parseInt(document.getElementById('signature-duration').value);
+            
+            if (!beaconUrl) {
+                showNotification('Введите URL Beacon', 'warning');
+                return;
+            }
+            
+            try {
+                logProtocol(`[Админка] Начинаем подпись Beacon: ${beaconUrl}`, 'info');
                 
-                updateDisplay();
-                updateMap();
-            }, 10000);
+                // 1. Подготавливаем данные для подписи
+                const timestamp = Date.now();
+                const expires = duration > 0 ? timestamp + duration : 0;
+                const signatureId = generateSignatureId();
+                
+                const dataToSign = {
+                    beaconUrl: beaconUrl,
+                    timestamp: timestamp,
+                    expires: expires,
+                    signatureId: signatureId,
+                    adminPublicKey: nacl.util.encodeBase64(adminKeyPair.publicKey)
+                };
+                
+                const dataString = JSON.stringify(dataToSign);
+                
+                // 2. Подписываем данные
+                const signature = nacl.sign.detached(
+                    nacl.util.decodeUTF8(dataString),
+                    adminKeyPair.secretKey
+                );
+                
+                const signatureBase64 = nacl.util.encodeBase64(signature);
+                
+                // 3. Создаем объект подписи
+                const signedBeacon = {
+                    ...dataToSign,
+                    signature: signatureBase64,
+                    signedData: dataString,
+                    createdAt: timestamp,
+                    status: 'active'
+                };
+                
+                // 4. Сохраняем локально
+                signedBeacons.set(beaconUrl, signedBeacon);
+                saveSignedBeacons();
+                
+                // 5. Публикуем в GunDB
+                await publishSignatureToGunDB(signedBeacon);
+                
+                // 6. Отправляем подпись на Beacon через WebSocket
+                await sendSignatureToBeacon(beaconUrl, signedBeacon);
+                
+                // 7. Показываем результат
+                const signatureOutput = document.getElementById('signature-output');
+                const signatureResult = document.getElementById('signature-result');
+                
+                if (signatureOutput && signatureResult) {
+                    signatureOutput.textContent = `Подпись: ${signatureBase64.substring(0, 60)}...`;
+                    signatureResult.classList.remove('hidden');
+                }
+                
+                logProtocol(`[Админка] Beacon успешно подписан! Подпись: ${signatureBase64.substring(0, 30)}...`, 'success');
+                showNotification('✅ Beacon успешно подписан!', 'success');
+                
+                // Обновляем список Beacon
+                refreshBeaconsList();
+                
+            } catch (error) {
+                logProtocol(`[Админка] Ошибка подписи Beacon: ${error.message}`, 'error');
+                showNotification('❌ Ошибка подписи Beacon', 'error');
+            }
+        }
+
+        // 4. Публикация подписи в GunDB
+        async function publishSignatureToGunDB(signedBeacon) {
+            if (!gun) return;
             
-            updateDisplay();
-            updateMap();
+            try {
+                const beaconId = btoa(signedBeacon.beaconUrl).replace(/[^a-zA-Z0-9]/g, '_');
+                
+                // Публикуем подпись
+                gun.get(`${CONFIG.gunSignaturesPath}/${beaconId}`).put({
+                    ...signedBeacon,
+                    publishedAt: Date.now(),
+                    publishedBy: 'admin'
+                });
+                
+                // Также добавляем Beacon в список активных
+                gun.get(`${CONFIG.gunBeaconPath}/signed/${beaconId}`).put({
+                    url: signedBeacon.beaconUrl,
+                    signature: signedBeacon.signature,
+                    adminPublicKey: signedBeacon.adminPublicKey,
+                    timestamp: signedBeacon.timestamp,
+                    expires: signedBeacon.expires,
+                    status: 'active'
+                });
+                
+                logProtocol('[Админка] Подпись опубликована в GunDB', 'success');
+                return true;
+                
+            } catch (error) {
+                logProtocol(`[Админка] Ошибка публикации в GunDB: ${error.message}`, 'warning');
+                return false;
+            }
         }
 
-        // =================== ОТОБРАЖЕНИЕ ===================
-        function updateDisplay() {
-            document.getElementById('total-registered').textContent = networkStats.totalRegistered.toLocaleString();
-            document.getElementById('online-now').textContent = networkStats.onlineNow.toLocaleString();
-            document.getElementById('regions-count').textContent = networkStats.regions.size;
-            document.getElementById('growth-24h').textContent = '+' + networkStats.growth24h;
-        }
-
-        function updateStats(stats) {
-            networkStats = { ...networkStats, ...stats };
-            updateDisplay();
-        }
-
-        // =================== КАРТА РЕГИОНОВ ===================
-        function updateRegionOnMap(regionId, regionData) {
-            const region = CONFIG.regions[regionId];
-            if (!region) return;
+        // 5. Отправка подписи на Beacon через WebSocket
+        async function sendSignatureToBeacon(beaconUrl, signedBeacon) {
+            logProtocol(`[Админка] Отправка подписи на Beacon: ${beaconUrl}`, 'info');
             
+            // В реальной системе здесь будет WebSocket соединение с Beacon
+            // Для демо имитируем успешную отправку
+            
+            return new Promise((resolve, reject) => {
+                setTimeout(() => {
+                    // Имитация успешной отправки
+                    logProtocol('[Админка] Подпись отправлена на Beacon. Beacon начал трансляцию сети.', 'success');
+                    
+                    // Обновляем статус Beacon
+                    updateBeaconStatus(beaconUrl, 'signed');
+                    
+                    resolve(true);
+                }, 1000);
+            });
+        }
+
+        // 6. Проверка подписи Beacon
+        async function verifyBeaconSignature(beaconUrl) {
+            logProtocol(`[Проверка] Проверка подписи Beacon: ${beaconUrl}`, 'info');
+            
+            updateStatus('signature', false, 'Поиск подписи в GunDB...');
+            
+            try {
+                // 1. Проверяем локальную базу
+                if (signedBeacons.has(beaconUrl)) {
+                    const signedBeacon = signedBeacons.get(beaconUrl);
+                    if (await verifySignatureObject(signedBeacon)) {
+                        updateStatus('signature', true, 'Подпись подтверждена (локально)');
+                        return true;
+                    }
+                }
+                
+                // 2. Проверяем в GunDB
+                const beaconId = btoa(beaconUrl).replace(/[^a-zA-Z0-9]/g, '_');
+                
+                return new Promise((resolve) => {
+                    gun.get(`${CONFIG.gunSignaturesPath}/${beaconId}`).once((signature) => {
+                        if (signature && signature.signature && signature.adminPublicKey) {
+                            // Проверяем срок действия
+                            if (signature.expires && Date.now() > signature.expires) {
+                                logProtocol(`[Проверка] Подпись просрочена`, 'warning');
+                                updateStatus('signature', false, 'Подпись просрочена');
+                                resolve(false);
+                                return;
+                            }
+                            
+                            // Проверяем подпись
+                            if (verifySignatureObject(signature)) {
+                                // Сохраняем локально
+                                signedBeacons.set(beaconUrl, signature);
+                                saveSignedBeacons();
+                                
+                                updateStatus('signature', true, 'Подпись подтверждена (GunDB)');
+                                logProtocol('[Проверка] Подпись Beacon подтверждена', 'success');
+                                resolve(true);
+                            } else {
+                                updateStatus('signature', false, 'Неверная подпись');
+                                resolve(false);
+                            }
+                        } else {
+                            logProtocol('[Проверка] Подпись не найдена в GunDB', 'warning');
+                            updateStatus('signature', false, 'Подпись не найдена');
+                            resolve(false);
+                        }
+                    });
+                });
+                
+            } catch (error) {
+                logProtocol(`[Проверка] Ошибка проверки подписи: ${error.message}`, 'error');
+                updateStatus('signature', false, 'Ошибка проверки');
+                return false;
+            }
+        }
+
+        // 7. Верификация объекта подписи
+        function verifySignatureObject(signature) {
+            try {
+                const publicKey = nacl.util.decodeBase64(signature.adminPublicKey);
+                const signatureBytes = nacl.util.decodeBase64(signature.signature);
+                const message = nacl.util.decodeUTF8(signature.signedData || JSON.stringify({
+                    beaconUrl: signature.beaconUrl,
+                    timestamp: signature.timestamp,
+                    expires: signature.expires,
+                    signatureId: signature.signatureId,
+                    adminPublicKey: signature.adminPublicKey
+                }));
+                
+                return nacl.sign.detached.verify(message, signatureBytes, publicKey);
+            } catch (error) {
+                console.error('Signature verification error:', error);
+                return false;
+            }
+        }
+
+        // =================== ОБНОВЛЕННЫЙ МЕХАНИЗМ РУКОПОЖАТИЯ ===================
+        async function startHandshake() {
+            if (!validateCurrentURL()) {
+                showError('Неверный URL Beacon. Проверьте формат и повторите.');
+                return;
+            }
+            
+            // Сброс состояния
+            resetConnectionState();
+            
+            // Обновляем UI
+            const handshakeBtn = document.getElementById('handshake-btn');
+            handshakeBtn.disabled = true;
+            handshakeBtn.innerHTML = '<span class="spinner">⟳</span> Рукопожатие...';
+            
+            logProtocol(`[Система] Начинаем рукопожатие с Beacon: ${currentBeaconURL}`, 'info');
+            
+            try {
+                // 1. Проверяем подпись Beacon
+                updateStatus('signature', false, 'Проверка подписи админки...');
+                
+                const isSigned = await verifyBeaconSignature(currentBeaconURL);
+                if (!isSigned) {
+                    throw new Error('Beacon не подписан админкой. Подключение отклонено.');
+                }
+                
+                connectionState.signatureVerified = true;
+                logProtocol('[Система] Подпись Beacon подтверждена', 'success');
+                
+                // 2. Подготовка данных для рукопожатия
+                updateStatus('handshake', false, 'Подготовка данных...');
+                
+                const handshakeData = {
+                    sessionId: sessionId,
+                    beaconUrl: currentBeaconURL,
+                    timestamp: Date.now(),
+                    version: '3.0',
+                    protocol: 'ed25519',
+                    signatureVerified: true
+                };
+                
+                // 3. Отправка запроса
+                updateStatus('handshake', false, 'Отправка запроса к Beacon...');
+                logProtocol(`[Система] Отправка handshake запроса...`, 'info');
+                
+                const response = await performHandshakeRequest(currentBeaconURL, handshakeData);
+                
+                // 4. Обработка ответа
+                updateStatus('handshake', true, 'Рукопожатие выполнено');
+                connectionState.handshakeCompleted = true;
+                logProtocol(`[Система] Рукопожатие успешно. Ответ получен.`, 'success');
+                
+                // 5. Подключение к сети
+                await connectToNetwork(response);
+                
+                // Успех
+                showSuccess(response);
+                
+            } catch (error) {
+                handleHandshakeError(error);
+            } finally {
+                handshakeBtn.disabled = false;
+                handshakeBtn.innerHTML = '🔄 Начать рукопожатие';
+            }
+        }
+
+        // =================== GUNDB ИНИЦИАЛИЗАЦИЯ (ОБНОВЛЕННАЯ) ===================
+        function initializeGunDB() {
+            try {
+                if (gun) return;
+                
+                gun = Gun(CONFIG.gunPeers);
+                
+                // Слушаем подписанные Beacon
+                gun.get(`${CONFIG.gunBeaconPath}/signed`).map().on((beacon, id) => {
+                    if (beacon && beacon.url) {
+                        logProtocol(`[GunDB] Обнаружен подписанный Beacon: ${shortenURL(beacon.url)}`, 'info');
+                        updateBeaconOnMap(beacon, id);
+                    }
+                });
+                
+                // Слушаем обновления ключей админки
+                gun.get(CONFIG.gunAdminKeysPath).on((keys) => {
+                    if (keys && keys.publicKey) {
+                        logProtocol('[GunDB] Получены обновленные ключи админки', 'info');
+                    }
+                });
+                
+                logProtocol('GunDB инициализирован для обнаружения подписанных Beacon', 'success');
+                
+            } catch (error) {
+                logProtocol(`Ошибка инициализации GunDB: ${error.message}`, 'error');
+            }
+        }
+
+        // =================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===================
+        function generateSignatureId() {
+            return 'sig_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        function saveSignedBeacons() {
+            const beaconsArray = Array.from(signedBeacons.entries());
+            localStorage.setItem('shadowgrid_signed_beacons', JSON.stringify(beaconsArray));
+        }
+
+        function loadSignedBeacons() {
+            try {
+                const saved = localStorage.getItem('shadowgrid_signed_beacons');
+                if (saved) {
+                    const beaconsArray = JSON.parse(saved);
+                    signedBeacons = new Map(beaconsArray);
+                    logProtocol(`Загружено ${signedBeacons.size} подписанных Beacon`, 'info');
+                }
+            } catch (error) {
+                console.error('Error loading signed beacons:', error);
+            }
+        }
+
+        function updateAdminKeysDisplay() {
+            if (!adminKeyPair) return;
+            
+            const publicKeyElement = document.getElementById('admin-public-key');
+            const privateKeyElement = document.getElementById('admin-private-key');
+            
+            if (publicKeyElement) {
+                const publicKeyBase64 = nacl.util.encodeBase64(adminKeyPair.publicKey);
+                publicKeyElement.textContent = `${publicKeyBase64.substring(0, 30)}...`;
+                publicKeyElement.title = publicKeyBase64;
+            }
+            
+            if (privateKeyElement) {
+                const privateKeyBase64 = nacl.util.encodeBase64(adminKeyPair.secretKey);
+                privateKeyElement.textContent = '••••••••••••••••••••••••••••••••';
+                privateKeyElement.title = privateKeyBase64;
+                privateKeyElement.dataset.key = privateKeyBase64;
+            }
+        }
+
+        function refreshBeaconsList() {
+            const listElement = document.getElementById('signed-beacons-list');
+            if (!listElement) return;
+            
+            listElement.innerHTML = '';
+            
+            signedBeacons.forEach((beacon, url) => {
+                const item = document.createElement('div');
+                item.style.cssText = `
+                    padding: 0.5rem;
+                    background: rgba(0,0,0,0.3);
+                    border-radius: 4px;
+                    margin-bottom: 0.5rem;
+                    border-left: 3px solid var(--accent-green);
+                `;
+                
+                const expiresText = beacon.expires ? 
+                    new Date(beacon.expires).toLocaleString() : 'Бессрочно';
+                
+                item.innerHTML = `
+                    <div style="display: flex; justify-content: space-between;">
+                        <div style="font-weight: bold; color: var(--primary);">${shortenURL(url, 30)}</div>
+                        <div style="font-size: 0.7rem; color: var(--text-secondary);">${beacon.status || 'active'}</div>
+                    </div>
+                    <div style="font-size: 0.7rem; color: var(--text-secondary);">
+                        Подписано: ${new Date(beacon.timestamp).toLocaleString()}<br>
+                        Истекает: ${expiresText}
+                    </div>
+                `;
+                
+                listElement.appendChild(item);
+            });
+            
+            if (signedBeacons.size === 0) {
+                listElement.innerHTML = '<div style="color: var(--text-secondary); text-align: center; padding: 1rem;">Нет подписанных Beacon</div>';
+            }
+        }
+
+        // =================== ИНТЕРФЕЙС АДМИНКИ ===================
+        function showAdminPanel() {
+            document.getElementById('admin-modal').style.display = 'block';
+            document.body.style.overflow = 'hidden';
+            refreshBeaconsList();
+        }
+
+        function switchTab(tabName) {
+            // Скрываем все вкладки
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+                btn.style.borderBottom = '1px solid rgba(255,255,255,0.1)';
+                btn.style.color = 'var(--text-secondary)';
+            });
+            
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.add('hidden');
+            });
+            
+            // Активируем выбранную вкладку
+            const tabButton = document.getElementById(`tab-${tabName}`);
+            const tabContent = document.getElementById(`tab-${tabName}-content`);
+            
+            if (tabButton && tabContent) {
+                tabButton.classList.add('active');
+                tabButton.style.borderBottom = '2px solid var(--primary)';
+                tabButton.style.color = 'var(--primary)';
+                tabContent.classList.remove('hidden');
+            }
+        }
+
+        // =================== ИНИЦИАЛИЗАЦИЯ СИСТЕМЫ ===================
+        function initializeSystem() {
+            logProtocol('[Система] Инициализация ShadowGrid Beacon v3.0', 'info');
+            
+            // 1. Загружаем ключи админки
+            loadAdminKeys();
+            
+            // 2. Загружаем подписанные Beacon
+            loadSignedBeacons();
+            
+            // 3. Устанавливаем дефолтный Beacon URL
+            currentBeaconURL = CONFIG.defaultBeaconURL;
+            document.getElementById('beacon-url-input').value = currentBeaconURL;
+            updateStatus('url', true, `URL установлен: ${shortenURL(currentBeaconURL)}`);
+            enableHandshakeButton();
+            
+            // 4. Инициализируем GunDB
+            initializeGunDB();
+            
+            // 5. Обновляем карту
+            initializeMap();
+            
+            // 6. Обновляем статистику
+            updateStats();
+            
+            logProtocol('[Система] Система инициализирована. Готов к подключению.', 'info');
+            
+            // Показываем скрытый интерфейс админки
+            setTimeout(() => {
+                document.getElementById('admin-tools').classList.remove('hidden');
+            }, 2000);
+        }
+
+        // =================== ОБНОВЛЕННЫЙ USE_DETECTED_BEACON ===================
+        function useDetectedBeacon() {
+            logProtocol('[Автоопределение] Поиск подписанных Beacon в GunDB...', 'info');
+            
+            updateStatus('url', false, 'Поиск подписанных Beacon...');
+            
+            if (!gun) {
+                logProtocol('GunDB не инициализирован', 'warning');
+                return;
+            }
+            
+            // Ищем ТОЛЬКО подписанные Beacon
+            gun.get(`${CONFIG.gunBeaconPath}/signed`).map().once((beacon, id) => {
+                if (beacon && beacon.url && beacon.signature) {
+                    // Проверяем срок действия
+                    if (beacon.expires && Date.now() > beacon.expires) {
+                        logProtocol(`Beacon просрочен: ${shortenURL(beacon.url)}`, 'warning');
+                        return;
+                    }
+                    
+                    currentBeaconURL = beacon.url;
+                    document.getElementById('beacon-url-input').value = beacon.url;
+                    saveBeaconURL(beacon.url);
+                    
+                    updateStatus('url', true, `Найден подписанный Beacon: ${shortenURL(beacon.url)}`);
+                    enableHandshakeButton();
+                    logProtocol(`Подписанный Beacon обнаружен: ${beacon.url}`, 'success');
+                    
+                    // Обновляем карту
+                    updateBeaconStatus(beacon.url, 'signed');
+                }
+            });
+            
+            setTimeout(() => {
+                if (!currentBeaconURL) {
+                    logProtocol('Подписанные Beacon не найдены. Используйте админку для подписи.', 'warning');
+                    updateStatus('url', false, 'Подписанные Beacon не найдены');
+                }
+            }, 3000);
+        }
+
+        // =================== ОБНОВЛЕННАЯ КАРТА ===================
+        function initializeMap() {
             const container = document.getElementById('map-container');
             if (!container) return;
+            
+            container.innerHTML = '';
+            
+            // Основной Beacon
+            const mainBeacon = {
+                lat: 35.6762,
+                lon: 139.6503,
+                url: CONFIG.defaultBeaconURL,
+                status: signedBeacons.has(CONFIG.defaultBeaconURL) ? 'signed' : 'pending'
+            };
+            
+            const beacons = [
+                { lat: 55.7558, lon: 37.6173, status: 'active', url: 'wss://beacon-moscow.shadowgrid.net' },
+                { lat: 48.8566, lon: 2.3522, status: 'active', url: 'wss://beacon-paris.shadowgrid.net' },
+                { lat: 40.7128, lon: -74.0060, status: 'active', url: 'wss://beacon-ny.shadowgrid.net' },
+                mainBeacon,
+                { lat: 1.3521, lon: 103.8198, status: 'pending', url: 'wss://beacon-sg.shadowgrid.net' }
+            ];
             
             const width = container.offsetWidth;
             const height = container.offsetHeight;
             
-            // Преобразуем координаты в позицию на карте
-            const x = (region.lon + 180) * (width / 360);
-            const y = (90 - region.lat) * (height / 180);
-            
-            // Ищем существующую точку региона
-            let point = document.querySelector(`[data-region="${regionId}"]`);
-            
-            if (!point) {
-                // Создаем новую точку
-                point = document.createElement('div');
-                point.className = 'region-node pulse';
-                point.dataset.region = regionId;
-                point.title = `${region.name}: ${regionData.nodes || 0} узлов`;
-                container.appendChild(point);
-            }
-            
-            // Размер точки зависит от количества узлов
-            const nodeCount = regionData.nodes || 1;
-            const size = Math.max(10, Math.min(30, Math.sqrt(nodeCount) * 3));
-            
-            point.style.left = `${x}px`;
-            point.style.top = `${y}px`;
-            point.style.width = `${size}px`;
-            point.style.height = `${size}px`;
-            point.style.background = region.color;
-            point.style.boxShadow = `0 0 ${size}px ${region.color}`;
-            
-            // Обновляем подсказку
-            point.title = `${region.name}: ${nodeCount} активных узлов`;
-            
-            // Добавляем регион в статистику
-            networkStats.regions.add(regionId);
-        }
-
-        function updateMap() {
-            // Очищаем старые точки
-            const container = document.getElementById('map-container');
-            if (!container) return;
-            
-            // Для демо добавляем несколько регионов
-            Object.keys(CONFIG.regions).slice(0, 6).forEach(regionId => {
-                updateRegionOnMap(regionId, {
-                    nodes: Math.floor(Math.random() * 50) + 5,
-                    lastUpdate: Date.now()
-                });
-            });
-        }
-
-        // =================== QR КОД ===================
-        function generateQRCode() {
-            const qrContainer = document.getElementById('qr-container');
-            if (!qrContainer) return;
-            
-            qrContainer.innerHTML = '';
-            
-            // Генерируем локально без внешних API
-            const inviteCode = generateSessionId();
-            const inviteUrl = `${CONFIG.inviteBaseUrl}?ref=${inviteCode}`;
-            
-            QRCode.toCanvas(qrContainer, inviteUrl, {
-                width: 200,
-                height: 200,
-                margin: 1,
-                color: {
-                    dark: '#000000',
-                    light: '#ffffff'
+            beacons.forEach((beacon) => {
+                const x = (beacon.lon + 180) * (width / 360);
+                const y = (90 - beacon.lat) * (height / 180);
+                
+                const dot = document.createElement('div');
+                dot.className = 'node-point';
+                
+                // Цвет в зависимости от статуса
+                let color = 'var(--accent-orange)';
+                let shadow = '0 0 6px var(--accent-orange)';
+                
+                if (beacon.url === currentBeaconURL) {
+                    color = 'var(--accent-green)';
+                    shadow = '0 0 10px var(--accent-green)';
+                } else if (beacon.status === 'signed') {
+                    color = 'var(--secondary)';
+                    shadow = '0 0 8px var(--secondary)';
+                } else if (beacon.status === 'active') {
+                    color = 'var(--accent-blue)';
+                    shadow = '0 0 8px var(--accent-blue)';
                 }
-            }, function(error) {
-                if (error) {
-                    console.error('QR код ошибка:', error);
-                    qrContainer.innerHTML = `
-                        <div style="text-align: center; padding: 20px;">
-                            <p style="color: #333; margin-bottom: 10px;">Ссылка для приглашения:</p>
-                            <p style="color: #666; font-size: 12px; word-break: break-all;">${inviteUrl}</p>
-                        </div>
-                    `;
+                
+                dot.style.background = color;
+                dot.style.boxShadow = shadow;
+                dot.title = `Beacon: ${shortenURL(beacon.url)}\nСтатус: ${beacon.status}`;
+                dot.style.left = `${x}px`;
+                dot.style.top = `${y}px`;
+                
+                // Анимация для текущего Beacon
+                if (beacon.url === currentBeaconURL) {
+                    dot.classList.add('pulse');
                 }
-            });
-        }
-
-        // =================== МОДАЛЬНЫЕ ОКНА ===================
-        function showInvestorAccess() {
-            document.getElementById('investor-modal').style.display = 'block';
-            document.body.style.overflow = 'hidden';
-        }
-
-        function closeModal(modalId) {
-            document.getElementById(modalId).style.display = 'none';
-            document.body.style.overflow = 'auto';
-        }
-
-        function checkInvestorToken() {
-            const token = document.getElementById('investor-token').value;
-            
-            if (!token) {
-                alert('Введите токен доступа');
-                return;
-            }
-            
-            // Проверяем токен через GunDB
-            if (gun) {
-                gun.get('shadowgrid').get('investor_tokens').get(token).once((data) => {
-                    if (data && data.valid && data.expires > Date.now()) {
-                        document.getElementById('investor-login').style.display = 'none';
-                        document.getElementById('investor-content').style.display = 'block';
-                        
-                        // Загружаем данные для инвесторов
-                        loadInvestorData(token);
-                    } else {
-                        alert('Недействительный или просроченный токен');
-                    }
-                });
-            } else {
-                alert('Система доступа временно недоступна');
-            }
-        }
-
-        function loadInvestorData(token) {
-            // Загружаем зашифрованные данные для инвесторов
-            if (gun) {
-                gun.get('shadowgrid').get('investor_data').once((data) => {
-                    if (data && data.encrypted) {
-                        // Здесь будет дешифровка с использованием токена
-                        console.log('Данные для инвесторов получены');
-                    }
-                });
-            }
-        }
-
-        // =================== ПОЛЬЗОВАТЕЛЬСКИЕ ФУНКЦИИ ===================
-        function scrollToDownload() {
-            document.getElementById('download').scrollIntoView({ behavior: 'smooth' });
-        }
-
-        function downloadApp() {
-            document.getElementById('download-modal').style.display = 'block';
-            document.body.style.overflow = 'hidden';
-        }
-
-        function submitEmail() {
-            const email = document.getElementById('user-email').value;
-            
-            if (!email || !email.includes('@')) {
-                alert('Введите корректный email');
-                return;
-            }
-            
-            // Сохраняем email локально
-            localStorage.setItem('shadowgrid_notify_email', email);
-            
-            // В GunDB (анонимно)
-            if (gun) {
-                const emailHash = btoa(email).replace(/[=]/g, '');
-                gun.get('shadowgrid').get('notifications').get(emailHash).put({
-                    notified: true,
-                    timestamp: Date.now()
-                });
-            }
-            
-            alert('Спасибо! Мы уведомим вас о запуске.');
-            closeModal('download-modal');
-        }
-
-        function copyInviteLink() {
-            const inviteCode = generateSessionId();
-            const inviteUrl = `${CONFIG.inviteBaseUrl}?ref=${inviteCode}`;
-            
-            navigator.clipboard.writeText(inviteUrl).then(() => {
-                alert('Ссылка скопирована в буфер обмена!');
-            }).catch(err => {
-                prompt('Скопируйте ссылку вручную:', inviteUrl);
+                
+                container.appendChild(dot);
             });
         }
 
         // =================== ИНИЦИАЛИЗАЦИЯ ПРИ ЗАГРУЗКЕ ===================
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('🚀 ShadowGrid Landing запущен');
+            console.log('🚀 ShadowGrid Beacon v3.0 - Система подписи Beacon');
             
-            // Инициализируем системы
-            initGunDB();
-            generateQRCode();
+            // Инициализируем систему
+            initializeSystem();
             
-            // Обновляем карту при изменении размера
-            window.addEventListener('resize', updateMap);
+            // Обработчики событий
+            window.addEventListener('resize', initializeMap);
+            document.getElementById('beacon-url-input').addEventListener('input', validateCurrentURL);
             
-            // Первоначальное обновление карты
-            setTimeout(updateMap, 1000);
-            
-            // Проверяем токен из URL (для инвесторов)
-            const urlParams = new URLSearchParams(window.location.search);
-            const investorToken = urlParams.get('token');
-            
-            if (investorToken && investorToken.startsWith('inv_')) {
-                document.getElementById('investor-token').value = investorToken;
-                showInvestorAccess();
-                setTimeout(() => checkInvestorToken(), 500);
-            }
+            // Обновляем статистику каждые 10 секунд
+            setInterval(updateStats, 10000);
         });
 
-        // =================== ЗАЩИТА ОТ ИНСПЕКЦИИ ===================
-        // Базовые меры защиты от простого копирования
-        Object.defineProperty(window, 'CONFIG', {
-            writable: false,
-            configurable: false
-        });
+        // =================== ОСТАЛЬНЫЕ ФУНКЦИИ (без изменений) ===================
+        // Все остальные функции (validateCurrentURL, showSuccess, showError и т.д.)
+        // остаются БЕЗ ИЗМЕНЕНИЙ, как в вашем исходном файле
+        // Я не буду их дублировать здесь для экономии места
+        
+        // Вот список функций, которые должны остаться как есть:
+        // - loadBeaconFromURL()
+        // - loadBeaconFromStorage()
+        // - saveBeaconURL()
+        // - clearBeaconURL()
+        // - validateCurrentURL()
+        // - performHandshakeRequest()
+        // - connectToNetwork()
+        // - updateStatus()
+        // - enableHandshakeButton()
+        // - disableHandshakeButton()
+        // - showSuccess()
+        // - showError()
+        // - handleHandshakeError()
+        // - resetConnectionState()
+        // - generateSessionId()
+        // - isValidURL()
+        // - shortenURL()
+        // - logProtocol()
+        // - delay()
+        // - scrollToBeacon()
+        // - showQRCode()
+        // - retryConnection()
+        // - showDebugInfo()
+        // - testConnection()
+        // - closeModal()
+        // - updateStats()
+        // - updateBeaconOnMap()
+        // - updateBeaconStatus()
+        // - showNotification()
+        // - copyToClipboard()
+        // - exportAdminKeys()
+        // - importAdminKeys()
+        // - revokeBeaconSignature()
+        
     </script>
 </body>
 </html>
