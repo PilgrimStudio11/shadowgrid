@@ -1,1525 +1,649 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ShadowGrid Beacon - Динамическое подключение</title>
-    <link rel="icon" type="image/x-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔗</text></svg>">
-    
-    <!-- Библиотеки -->
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/tweetnacl/nacl-fast.min.js"></script>
-    
-    <style>
-        /* Все стили остаются без изменений */
-        :root {
-            --primary: #00f3ff;
-            --secondary: #8a2be2;
-            --accent-green: #00ff88;
-            --accent-blue: #0099ff;
-            --accent-orange: #ffaa00;
-            --accent-red: #ff4444;
-            --dark: #0a0a0f;
-            --darker: #050508;
-            --card-bg: rgba(20, 20, 30, 0.9);
-            --light: #f0f0f0;
-            --text-secondary: #b0b0c0;
-        }
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            background: var(--dark);
-            color: var(--light);
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-            line-height: 1.6;
-            overflow-x: hidden;
-            background-image: 
-                radial-gradient(circle at 20% 30%, rgba(0, 153, 255, 0.05) 0%, transparent 40%),
-                radial-gradient(circle at 80% 70%, rgba(138, 43, 226, 0.05) 0%, transparent 40%);
-        }
-        
-        /* Анимации */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        @keyframes pulse {
-            0% { opacity: 0.6; }
-            50% { opacity: 1; }
-            100% { opacity: 0.6; }
-        }
-        
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-        
-        .fade-in {
-            animation: fadeIn 0.5s ease-out;
-        }
-        
-        .pulse {
-            animation: pulse 2s infinite;
-        }
-        
-        .spinner {
-            animation: spin 1s linear infinite;
-        }
-        
-        /* Шапка */
-        .header {
-            background: rgba(10, 10, 15, 0.95);
-            backdrop-filter: blur(10px);
-            position: fixed;
-            top: 0;
-            width: 100%;
-            z-index: 1000;
-            border-bottom: 1px solid rgba(0, 243, 255, 0.2);
-        }
-        
-        .nav-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 1rem 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: var(--primary);
-            text-decoration: none;
-        }
-        
-        .nav-links {
-            display: flex;
-            gap: 2rem;
-            align-items: center;
-        }
-        
-        .nav-links a {
-            color: var(--light);
-            text-decoration: none;
-            transition: color 0.3s;
-            font-size: 0.95rem;
-            position: relative;
-            padding: 5px 0;
-        }
-        
-        .nav-links a::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 0;
-            height: 2px;
-            background: var(--primary);
-            transition: width 0.3s;
-        }
-        
-        .nav-links a:hover::after {
-            width: 100%;
-        }
-        
-        .cta-button {
-            background: linear-gradient(45deg, var(--primary), var(--secondary));
-            color: white;
-            padding: 0.8rem 1.5rem;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: bold;
-            border: none;
-            cursor: pointer;
-            transition: all 0.3s;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .cta-button:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(0, 243, 255, 0.3);
-        }
-        
-        .cta-button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-        
-        /* Герой секция */
-        .hero {
-            padding: 140px 2rem 60px;
-            text-align: center;
-            background: linear-gradient(180deg, var(--darker) 0%, var(--dark) 100%);
-        }
-        
-        .hero h1 {
-            font-size: 2.8rem;
-            margin-bottom: 1.5rem;
-            background: linear-gradient(45deg, var(--primary), var(--accent-blue));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            line-height: 1.2;
-        }
-        
-        .hero-subtitle {
-            font-size: 1.2rem;
-            color: var(--text-secondary);
-            max-width: 800px;
-            margin: 0 auto 3rem;
-        }
-        
-        /* Статистика */
-        .live-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1.5rem;
-            max-width: 900px;
-            margin: 3rem auto;
-        }
-        
-        .stat-card {
-            background: var(--card-bg);
-            border-radius: 12px;
-            padding: 1.8rem;
-            text-align: center;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
-            transition: transform 0.3s;
-        }
-        
-        .stat-card:hover {
-            transform: translateY(-3px);
-        }
-        
-        .stat-number {
-            font-size: 2.5rem;
-            font-weight: bold;
-            color: var(--primary);
-            margin-bottom: 0.5rem;
-        }
-        
-        .stat-label {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-        }
-        
-        /* Beacon Connection */
-        .beacon-section {
-            padding: 4rem 2rem;
-            background: var(--darker);
-        }
-        
-        .section-title {
-            text-align: center;
-            font-size: 2.2rem;
-            margin-bottom: 2rem;
-            color: var(--primary);
-        }
-        
-        .section-subtitle {
-            text-align: center;
-            color: var(--text-secondary);
-            max-width: 800px;
-            margin: 0 auto 3rem;
-        }
-        
-        .connection-container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: var(--card-bg);
-            border-radius: 12px;
-            padding: 2rem;
-            border: 1px solid rgba(0, 153, 255, 0.2);
-        }
-        
-        .status-item {
-            display: flex;
-            align-items: center;
-            padding: 1.2rem;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 8px;
-            margin-bottom: 1rem;
-            border-left: 3px solid #666;
-            transition: all 0.3s;
-        }
-        
-        .status-item.active {
-            border-left-color: var(--accent-green);
-            background: rgba(0, 255, 136, 0.05);
-        }
-        
-        .status-item.error {
-            border-left-color: var(--accent-red);
-            background: rgba(255, 68, 68, 0.05);
-        }
-        
-        .status-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            margin-right: 15px;
-            background: #666;
-        }
-        
-        .status-dot.active {
-            background: var(--accent-green);
-            box-shadow: 0 0 10px var(--accent-green);
-        }
-        
-        .status-dot.error {
-            background: var(--accent-red);
-            box-shadow: 0 0 10px var(--accent-red);
-        }
-        
-        /* URL Input */
-        .url-input-section {
-            margin: 2rem 0;
-            padding: 1.5rem;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 8px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        .input-group {
-            display: flex;
-            gap: 10px;
-            margin-top: 1rem;
-        }
-        
-        .url-input {
-            flex: 1;
-            padding: 1rem;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(0, 153, 255, 0.3);
-            border-radius: 8px;
-            color: white;
-            font-family: 'Courier New', monospace;
-            font-size: 0.9rem;
-        }
-        
-        .url-input:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 10px rgba(0, 243, 255, 0.2);
-        }
-        
-        /* Protocol Display */
-        .protocol-display {
-            background: rgba(0, 0, 0, 0.3);
-            padding: 1rem;
-            border-radius: 8px;
-            margin: 1rem 0;
-            font-family: 'Courier New', monospace;
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            max-height: 150px;
-            overflow-y: auto;
-        }
-        
-        .protocol-line {
-            margin-bottom: 5px;
-            padding: 2px 0;
-        }
-        
-        .protocol-line.success {
-            color: var(--accent-green);
-        }
-        
-        .protocol-line.error {
-            color: var(--accent-red);
-        }
-        
-        .protocol-line.info {
-            color: var(--accent-blue);
-        }
-        
-        /* Карта */
-        .network-map {
-            padding: 4rem 2rem;
-            background: var(--dark);
-        }
-        
-        #map-container {
-            max-width: 1000px;
-            margin: 0 auto;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 12px;
-            overflow: hidden;
-            height: 400px;
-            position: relative;
-            border: 1px solid rgba(0, 153, 255, 0.2);
-        }
-        
-        .node-point {
-            position: absolute;
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            cursor: pointer;
-            transition: all 0.3s;
-            z-index: 1;
-        }
-        
-        .node-point:hover {
-            width: 10px;
-            height: 10px;
-            z-index: 10;
-        }
-        
-        /* Футер */
-        footer {
-            background: var(--darker);
-            padding: 3rem 2rem;
-            text-align: center;
-            border-top: 1px solid rgba(0, 243, 255, 0.2);
-        }
-        
-        /* Модальные окна */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.95);
-            z-index: 2000;
-            padding: 1rem;
-            overflow-y: auto;
-            backdrop-filter: blur(10px);
-        }
-        
-        .modal-content {
-            max-width: 500px;
-            margin: 2rem auto;
-            background: var(--card-bg);
-            padding: 2rem;
-            border-radius: 12px;
-            border: 2px solid var(--primary);
-        }
-        
-        /* Адаптивность */
-        @media (max-width: 768px) {
-            .hero h1 {
-                font-size: 2rem;
-            }
-            
-            .input-group {
-                flex-direction: column;
-            }
-            
-            .nav-links {
-                display: none;
-            }
-            
-            .live-stats {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 1rem;
-            }
-        }
-        
-        /* Утилиты */
-        .hidden {
-            display: none !important;
-        }
-        
-        .text-center {
-            text-align: center;
-        }
-        
-        .mt-2 { margin-top: 2rem; }
-        .mb-2 { margin-bottom: 2rem; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>P2P Mesh</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+    body { background: #0a0a0a; color: #e0e0e0; height: 100vh; display: flex; justify-content: center; align-items: center; }
+    #app { width: 100%; max-width: 500px; height: 100%; background: #1f1f1f; display: flex; flex-direction: column; position: relative; border-radius: 24px; overflow: hidden; }
+    .screen { display: none; flex-direction: column; height: 100%; }
+    .screen.active { display: flex; }
+    .chat-header { padding: 16px; background: #2c2c2e; display: flex; align-items: center; gap: 12px; border-bottom: 0.5px solid #3a3a3c; }
+    .back-btn, .call-btn { background: none; border: none; color: #007aff; font-size: 24px; cursor: pointer; }
+    .contact-name { font-size: 18px; font-weight: 600; flex: 1; }
+    .messages-container { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+    .message { max-width: 80%; padding: 8px 12px; border-radius: 18px; background: #2c2c2e; align-self: flex-start; }
+    .message.own { background: #007aff; align-self: flex-end; }
+    .message-text { font-size: 15px; }
+    .message-time { font-size: 10px; color: #8e8e93; margin-top: 4px; text-align: right; }
+    .input-area { padding: 12px; background: #2c2c2e; display: flex; gap: 8px; border-top: 0.5px solid #3a3a3c; }
+    .input-area input { flex: 1; padding: 10px; border-radius: 24px; border: none; background: #3a3a3c; color: white; font-size: 16px; }
+    .input-area button { background: #007aff; border: none; border-radius: 24px; padding: 0 16px; color: white; font-weight: 600; cursor: pointer; }
+    .auth-container { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 24px; gap: 20px; }
+    .auth-container input { padding: 14px; border-radius: 12px; border: none; background: #2c2c2e; color: white; font-size: 16px; }
+    .auth-container button { background: #007aff; border: none; border-radius: 12px; padding: 14px; color: white; font-weight: bold; font-size: 16px; cursor: pointer; }
+    .contact-list { flex: 1; overflow-y: auto; padding: 16px; }
+    .contact-item { background: #2c2c2e; padding: 12px; border-radius: 14px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+    .online-badge { width: 10px; height: 10px; border-radius: 10px; background: #34c759; margin-left: 8px; display: inline-block; }
+    .add-contact { margin: 16px; display: flex; flex-direction: column; gap: 8px; }
+    .add-contact input { padding: 12px; border-radius: 24px; border: none; background: #2c2c2e; color: white; }
+    .add-contact button { background: #007aff; border: none; border-radius: 24px; padding: 12px; font-weight: bold; }
+    .video-call { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 1000; display: none; flex-direction: column; }
+    .video-call.active { display: flex; }
+    .remote-video { flex: 1; background: #000; }
+    .remote-video video { width: 100%; height: 100%; object-fit: cover; }
+    .local-video { position: absolute; bottom: 20px; right: 20px; width: 120px; height: 160px; background: #333; border-radius: 12px; overflow: hidden; border: 2px solid white; }
+    .local-video video { width: 100%; height: 100%; object-fit: cover; }
+    .call-controls { position: absolute; bottom: 30px; left: 0; right: 0; display: flex; justify-content: center; gap: 30px; background: rgba(0,0,0,0.6); padding: 12px; }
+    .call-controls button { background: #ff3b30; border: none; border-radius: 50%; width: 60px; height: 60px; font-size: 24px; color: white; cursor: pointer; }
+    .qr-popup { position: fixed; bottom: 20px; left: 20px; background: white; padding: 12px; border-radius: 16px; z-index: 200; text-align: center; max-width: 260px; }
+    .qr-popup canvas, .qr-popup img { width: 200px; height: 200px; }
+    .share-btn { background: #34c759; border: none; border-radius: 12px; padding: 12px; color: white; font-weight: bold; margin-top: 8px; cursor: pointer; }
+    .hidden { display: none; }
+    .network-info { font-size: 12px; color: #8e8e93; padding: 8px 16px; background: #2c2c2e; text-align: center; }
+    .tab-bar { display: flex; background: #2c2c2e; border-top: 0.5px solid #3a3a3c; }
+    .tab { flex: 1; text-align: center; padding: 12px; color: #8e8e93; font-weight: 500; cursor: pointer; }
+    .tab.active { color: #007aff; border-bottom: 2px solid #007aff; }
+    .button-row { display: flex; gap: 8px; margin-top: 8px; }
+    .button-row button { flex: 1; }
+    .platform-specific { margin-top: 8px; }
+  </style>
+  <script src="https://unpkg.com/simple-peer@9.11.1/simplepeer.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <!-- WebTorrent подгружается только на Android, на iPhone он не нужен -->
+  <script>
+    window.isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    if (!window.isIOS) {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/webtorrent@2.2.2/webtorrent.min.js"><\/script>');
+    }
+  </script>
 </head>
 <body>
-    <!-- Шапка -->
-    <header class="header">
-        <nav class="nav-container">
-            <a href="#" class="logo">
-                <span>🔗</span>
-                <span>ShadowGrid Beacon</span>
-            </a>
-            <div class="nav-links">
-                <a href="#beacon">Подключение</a>
-                <a href="#network">Сеть</a>
-                <a href="#admin">Админка</a>
-            </div>
-        </nav>
-    </header>
-
-    <!-- Герой секция -->
-    <section class="hero">
-        <h1 class="fade-in">ShadowGrid Beacon v3.0</h1>
-        <p class="hero-subtitle fade-in">
-            Динамическое подключение к Beacon через URL из админки. Реальное рукопожатие, настоящая сеть.
-        </p>
-        
-        <div class="live-stats">
-            <div class="stat-card fade-in">
-                <div class="stat-number" id="total-nodes">1,847</div>
-                <div class="stat-label">Активных узлов</div>
-            </div>
-            <div class="stat-card fade-in">
-                <div class="stat-number" id="beacons-online">3</div>
-                <div class="stat-label">Маяков онлайн</div>
-            </div>
-            <div class="stat-card fade-in">
-                <div class="stat-number" id="handshakes">42.8K</div>
-                <div class="stat-label">Рукопожатий</div>
-            </div>
-            <div class="stat-card fade-in">
-                <div class="stat-number" id="latency">47ms</div>
-                <div class="stat-label">Средняя задержка</div>
-            </div>
-        </div>
-        
-        <button onclick="scrollToBeacon()" class="cta-button fade-in">
-            🔗 Начать подключение
-        </button>
-    </section>
-
-    <!-- Beacon Connection -->
-    <section id="beacon" class="beacon-section">
-        <h2 class="section-title">🤝 Динамическое подключение к Beacon</h2>
-        <p class="section-subtitle">
-            URL для рукопожатия берётся из админки через GunDB или параметр URL
-        </p>
-        
-        <div class="connection-container">
-            <!-- URL Input Section -->
-            <div class="url-input-section">
-                <h3 style="color: var(--primary); margin-bottom: 1rem;">URL для рукопожатия</h3>
-                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1rem;">
-                    Вставьте URL из админки ShadowGrid или используйте автоматическое обнаружение через GunDB
-                </p>
-                
-                <div class="input-group">
-                    <input type="text" id="beacon-url-input" class="url-input" 
-                           placeholder="wss://web-production-50e5e.up.railway.app" 
-                           value="wss://web-production-50e5e.up.railway.app">
-                    <button onclick="useDetectedBeacon()" class="cta-button" style="white-space: nowrap;">
-                        🔍 Автоопределение
-                    </button>
-                </div>
-                
-                <div style="margin-top: 1rem; display: flex; gap: 10px; flex-wrap: wrap;">
-                    <button onclick="loadBeaconFromURL()" class="cta-button" style="background: var(--accent-blue);">
-                        📋 Из параметра URL
-                    </button>
-                    <button onclick="loadBeaconFromStorage()" class="cta-button" style="background: var(--secondary);">
-                        💾 Из сохранённого
-                    </button>
-                    <button onclick="clearBeaconURL()" class="cta-button" style="background: var(--accent-red);">
-                        🗑️ Очистить
-                    </button>
-                </div>
-            </div>
-            
-            <!-- Connection Status -->
-            <div id="connection-status">
-                <div class="status-item" id="status-url">
-                    <div class="status-dot" id="dot-url"></div>
-                    <div style="flex: 1;">
-                        <div>URL Beacon определён</div>
-                        <div style="font-size: 0.9rem; color: var(--text-secondary);" id="status-url-text">
-                            Ожидание ввода URL...
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="status-item" id="status-signature">
-                    <div class="status-dot" id="dot-signature"></div>
-                    <div style="flex: 1;">
-                        <div>Проверка подписи Beacon</div>
-                        <div style="font-size: 0.9rem; color: var(--text-secondary);" id="status-signature-text">
-                            Проверка подписи админки...
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="status-item" id="status-handshake">
-                    <div class="status-dot" id="dot-handshake"></div>
-                    <div style="flex: 1;">
-                        <div>Рукопожатие (Handshake)</div>
-                        <div style="font-size: 0.9rem; color: var(--text-secondary);" id="status-handshake-text">
-                            Ожидание подключения...
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="status-item" id="status-network">
-                    <div class="status-dot" id="dot-network"></div>
-                    <div style="flex: 1;">
-                        <div>Подключение к сети</div>
-                        <div style="font-size: 0.9rem; color: var(--text-secondary);" id="status-network-text">
-                            Инициализация P2P...
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Protocol Display -->
-            <div class="protocol-display" id="protocol-log">
-                <div class="protocol-line info">[Система] ShadowGrid Beacon v3.0 инициализирован</div>
-                <div class="protocol-line info">[Система] Ожидание URL Beacon для рукопожатия</div>
-            </div>
-            
-            <!-- Action Buttons -->
-            <div style="margin-top: 2rem; text-align: center;">
-                <button onclick="startHandshake()" id="handshake-btn" class="cta-button" disabled>
-                    🔄 Начать рукопожатие
-                </button>
-                <button onclick="showQRCode()" class="cta-button" style="background: var(--secondary); margin-left: 1rem;">
-                    📱 QR для мобильных
-                </button>
-            </div>
-            
-            <!-- Success Section -->
-            <div id="success-section" class="hidden" style="margin-top: 2rem; padding: 2rem; background: rgba(0, 255, 136, 0.1); border-radius: 8px; border: 1px solid var(--accent-green); text-align: center;">
-                <div style="font-size: 3rem; margin-bottom: 1rem;">✅</div>
-                <h3 style="color: var(--accent-green); margin-bottom: 1rem;">Beacon подключён!</h3>
-                <p style="color: var(--text-secondary); margin-bottom: 1.5rem;" id="success-message">
-                    Рукопожатие выполнено успешно. Вы подключены к сети ShadowGrid.
-                </p>
-                <div id="connection-details" style="text-align: left; background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 8px; margin: 1rem 0;">
-                    <!-- Детали подключения -->
-                </div>
-            </div>
-            
-            <!-- Error Section -->
-            <div id="error-section" class="hidden" style="margin-top: 2rem; padding: 1.5rem; background: rgba(255, 68, 68, 0.1); border-radius: 8px; border: 1px solid var(--accent-red);">
-                <h4 style="color: var(--accent-red); margin-bottom: 0.5rem;">⚠️ Ошибка подключения</h4>
-                <p id="error-message" style="color: var(--text-secondary); font-size: 0.9rem;"></p>
-                <div style="margin-top: 1rem;">
-                    <button onclick="retryConnection()" class="cta-button" style="background: var(--accent-red); margin-right: 10px;">
-                        🔄 Повторить
-                    </button>
-                    <button onclick="showDebugInfo()" class="cta-button" style="background: var(--accent-orange);">
-                        🐛 Отладка
-                    </button>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Карта сети -->
-    <section id="network" class="network-map">
-        <h2 class="section-title">🗺️ Активные Beacon в сети</h2>
-        <p class="section-subtitle">
-            Реальные маяки, доступные для подключения. Обновляется в реальном времени через GunDB
-        </p>
-        
-        <div id="map-container">
-            <!-- Точки добавляются через JS -->
-        </div>
-        
-        <div style="text-align: center; margin-top: 2rem;">
-            <div style="display: inline-flex; gap: 1.5rem; flex-wrap: wrap; justify-content: center;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <div style="width: 8px; height: 8px; background: var(--accent-blue); border-radius: 50%;"></div>
-                    <span>Активный Beacon</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <div style="width: 8px; height: 8px; background: var(--accent-green); border-radius: 50%;"></div>
-                    <span>Подключённый Beacon</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <div style="width: 8px; height: 8px; background: var(--accent-orange); border-radius: 50%;"></div>
-                    <span>Beacon в ожидании</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <div style="width: 8px; height: 8px; background: var(--secondary); border-radius: 50%;"></div>
-                    <span>Подписанный Beacon</span>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Скрытый интерфейс админки для подписи Beacon -->
-    <div id="admin-tools" class="hidden" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999;">
-        <div style="background: var(--darker); padding: 1rem; border-radius: 8px; border: 1px solid var(--primary); max-width: 300px;">
-            <h4 style="color: var(--primary); margin-bottom: 0.5rem;">🔐 Админка: Подпись Beacon</h4>
-            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1rem;">
-                Скрытый интерфейс для подписи Beacon через админку
-            </div>
-            <button onclick="showAdminPanel()" class="cta-button" style="padding: 0.5rem 1rem; font-size: 0.8rem; width: 100%;">
-                📋 Открыть панель админки
-            </button>
-        </div>
+<div id="app">
+  <!-- Экран авторизации -->
+  <div id="authScreen" class="screen active">
+    <div class="auth-container">
+      <h2 style="text-align:center">P2P Mesh</h2>
+      <input type="text" id="loginUsername" placeholder="Ваш ник">
+      <input type="password" id="loginPassword" placeholder="Пароль">
+      <button id="loginBtn">Войти / Создать</button>
+      <div style="font-size:12px; color:#8e8e93; text-align:center;">Пароль остаётся на устройстве<br>Все данные шифруются локально</div>
+      <div id="installMethods" class="platform-specific"></div>
     </div>
+  </div>
 
-    <!-- Модальное окно админки -->
-    <div id="admin-modal" class="modal">
-        <div class="modal-content" style="max-width: 600px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                <h2 style="color: var(--primary);">🔐 Админка ShadowGrid</h2>
-                <button onclick="closeModal('admin-modal')" style="background: none; border: none; color: #aaa; font-size: 1.5rem; cursor: pointer;">✕</button>
-            </div>
-            
-            <!-- Вкладки админки -->
-            <div style="display: flex; gap: 0; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 1.5rem;">
-                <button id="tab-keys" class="tab-button active" onclick="switchTab('keys')" style="flex: 1; padding: 0.8rem; background: none; border: none; color: var(--primary); border-bottom: 2px solid var(--primary); cursor: pointer;">
-                    🗝️ Ключи
-                </button>
-                <button id="tab-sign" class="tab-button" onclick="switchTab('sign')" style="flex: 1; padding: 0.8rem; background: none; border: none; color: var(--text-secondary); border-bottom: 1px solid rgba(255,255,255,0.1); cursor: pointer;">
-                    ✍️ Подпись Beacon
-                </button>
-                <button id="tab-beacons" class="tab-button" onclick="switchTab('beacons')" style="flex: 1; padding: 0.8rem; background: none; border: none; color: var(--text-secondary); border-bottom: 1px solid rgba(255,255,255,0.1); cursor: pointer;">
-                    📡 Управление Beacon
-                </button>
-            </div>
-            
-            <!-- Содержимое вкладок -->
-            <div id="tab-content">
-                <!-- Вкладка ключей -->
-                <div id="tab-keys-content" class="tab-content active">
-                    <h3 style="color: var(--primary); margin-bottom: 1rem;">🔑 Ключи админки Ed25519</h3>
-                    
-                    <div style="margin-bottom: 1.5rem; padding: 1rem; background: rgba(0,0,0,0.3); border-radius: 8px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                            <span style="color: var(--text-secondary);">Статус ключей:</span>
-                            <span id="keys-status" style="color: var(--accent-green); font-weight: bold;">✅ Сгенерированы</span>
-                        </div>
-                        <div style="font-size: 0.8rem; color: var(--text-secondary);">
-                            Последнее обновление: <span id="keys-updated">только что</span>
-                        </div>
-                    </div>
-                    
-                    <div style="display: grid; gap: 1rem; margin-bottom: 1.5rem;">
-                        <div>
-                            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Публичный ключ админки:</div>
-                            <div id="admin-public-key" style="font-family: 'Courier New', monospace; font-size: 0.75rem; color: var(--light); background: rgba(0,0,0,0.5); padding: 0.5rem; border-radius: 4px; word-break: break-all; cursor: pointer;" onclick="copyToClipboard('admin-public-key')">
-                                Нажмите "Генерировать ключи"
-                            </div>
-                        </div>
-                        <div>
-                            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Приватный ключ админки:</div>
-                            <div id="admin-private-key" style="font-family: 'Courier New', monospace; font-size: 0.75rem; color: var(--light); background: rgba(255,68,68,0.1); padding: 0.5rem; border-radius: 4px; word-break: break-all; cursor: pointer;" onclick="copyToClipboard('admin-private-key')">
-                                ••••••••••••••••••••••••••••••••
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                        <button onclick="generateAdminKeys()" class="cta-button" style="flex: 1; padding: 0.5rem; font-size: 0.9rem;">
-                            🗝️ Сгенерировать ключи
-                        </button>
-                        <button onclick="exportAdminKeys()" class="cta-button" style="flex: 1; padding: 0.5rem; font-size: 0.9rem; background: var(--accent-blue);">
-                            💾 Экспорт ключей
-                        </button>
-                        <button onclick="importAdminKeys()" class="cta-button" style="flex: 1; padding: 0.5rem; font-size: 0.9rem; background: var(--secondary);">
-                            📥 Импорт ключей
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- Вкладка подписи -->
-                <div id="tab-sign-content" class="tab-content hidden">
-                    <h3 style="color: var(--primary); margin-bottom: 1rem;">✍️ Подпись Beacon</h3>
-                    
-                    <div style="margin-bottom: 1.5rem;">
-                        <div style="color: var(--text-secondary); margin-bottom: 0.5rem;">URL Beacon для подписи:</div>
-                        <input type="text" id="admin-beacon-url" class="url-input" 
-                               placeholder="wss://web-production-50e5e.up.railway.app" 
-                               value="wss://web-production-50e5e.up.railway.app">
-                    </div>
-                    
-                    <div style="margin-bottom: 1.5rem;">
-                        <div style="color: var(--text-secondary); margin-bottom: 0.5rem;">Длительность подписи:</div>
-                        <select id="signature-duration" class="url-input" style="width: 100%;">
-                            <option value="86400000">24 часа</option>
-                            <option value="604800000">7 дней</option>
-                            <option value="2592000000">30 дней</option>
-                            <option value="31536000000">1 год</option>
-                            <option value="0">Бессрочно</option>
-                        </select>
-                    </div>
-                    
-                    <button onclick="adminSignBeacon()" class="cta-button" style="width: 100%; margin-bottom: 1rem; background: var(--accent-green);">
-                        ✅ Подписать Beacon
-                    </button>
-                    
-                    <div id="signature-result" class="hidden" style="padding: 1rem; background: rgba(0,255,136,0.1); border-radius: 8px; border: 1px solid var(--accent-green);">
-                        <h4 style="color: var(--accent-green); margin-bottom: 0.5rem;">✅ Beacon подписан!</h4>
-                        <div style="font-family: 'Courier New', monospace; font-size: 0.7rem; color: var(--light); word-break: break-all; margin-bottom: 0.5rem;" id="signature-output"></div>
-                        <div style="font-size: 0.8rem; color: var(--text-secondary);">
-                            Подпись опубликована в GunDB и отправлена на Beacon
-                        </div>
-                    </div>
-                    
-                    <div style="margin-top: 1.5rem; padding: 1rem; background: rgba(0,0,0,0.3); border-radius: 8px;">
-                        <h4 style="color: var(--accent-blue); margin-bottom: 0.5rem;">ℹ️ Как работает подпись:</h4>
-                        <ol style="color: var(--text-secondary); font-size: 0.8rem; padding-left: 1.2rem;">
-                            <li>Админка генерирует пару ключей Ed25519</li>
-                            <li>Админка подписывает Beacon (URL + timestamp + session)</li>
-                            <li>Подпись публикуется в GunDB для проверки</li>
-                            <li>Подпись отправляется на Beacon через WebSocket</li>
-                            <li>Beacon начинает транслировать сеть с этой подписью</li>
-                        </ol>
-                    </div>
-                </div>
-                
-                <!-- Вкладка управления Beacon -->
-                <div id="tab-beacons-content" class="tab-content hidden">
-                    <h3 style="color: var(--primary); margin-bottom: 1rem;">📡 Управление Beacon</h3>
-                    
-                    <div style="margin-bottom: 1.5rem; max-height: 200px; overflow-y: auto;">
-                        <div id="signed-beacons-list">
-                            <!-- Список подписанных Beacon -->
-                        </div>
-                    </div>
-                    
-                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                        <button onclick="refreshBeaconsList()" class="cta-button" style="flex: 1; padding: 0.5rem; font-size: 0.9rem;">
-                            🔄 Обновить список
-                        </button>
-                        <button onclick="revokeBeaconSignature()" class="cta-button" style="flex: 1; padding: 0.5rem; font-size: 0.9rem; background: var(--accent-red);">
-                            🚫 Отозвать подпись
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
+  <!-- Главный экран -->
+  <div id="mainScreen" class="screen">
+    <div class="chat-header">
+      <div style="flex:1; font-weight:600;">Моя сеть</div>
+      <button id="shareAppBtn" class="share-btn">📲 Поделиться приложением</button>
     </div>
-
-    <!-- Остальные модальные окна остаются без изменений -->
-    <div id="debug-modal" class="modal">
-        <!-- ... содержимое без изменений ... -->
+    <div class="network-info" id="networkInfo"></div>
+    <div class="tab-bar">
+      <div class="tab active" data-tab="chats">Чаты</div>
+      <div class="tab" data-tab="contacts">Контакты</div>
     </div>
-    
-    <div id="qr-modal" class="modal">
-        <!-- ... содержимое без изменений ... -->
+    <div id="chatsList" class="contact-list"></div>
+    <div id="contactsList" class="contact-list hidden"></div>
+    <div class="add-contact" id="addContactPanel">
+      <input type="text" id="newContactOffer" placeholder="Вставить оффер для P2P соединения">
+      <button id="addContactBtn">➕ Добавить контакт по офферу</button>
+      <div class="button-row">
+        <button id="generateOfferBtn" class="share-btn">📡 Мой QR-оффер для контакта</button>
+      </div>
     </div>
+  </div>
 
-    <script>
-        // =================== КОНФИГУРАЦИЯ ===================
-        const CONFIG = {
-            // GunDB для обнаружения Beacon
-            gunPeers: [
-                'https://gun-us.herokuapp.com/gun',
-                'https://gun-eu.herokuapp.com/gun'
-            ],
-            
-            // Ключи в GunDB
-            gunBeaconPath: 'shadowgrid/beacons',
-            gunSignaturesPath: 'shadowgrid/signatures',
-            gunAdminKeysPath: 'shadowgrid/admin/keys',
-            
-            // Основной Beacon (первый маяк на Railway)
-            defaultBeaconURL: 'wss://web-production-50e5e.up.railway.app',
-            
-            // Время жизни подписи (24 часа по умолчанию)
-            signatureLifetime: 86400000,
-        };
+  <!-- Экран чата -->
+  <div id="chatScreen" class="screen">
+    <div class="chat-header">
+      <button class="back-btn" id="chatBackBtn">←</button>
+      <div class="contact-name" id="chatContactName"></div>
+      <div class="call-buttons">
+        <button class="call-btn" id="audioCallBtn">📞</button>
+        <button class="call-btn" id="videoCallBtn">📹</button>
+      </div>
+    </div>
+    <div class="messages-container" id="messagesContainer"></div>
+    <div class="input-area">
+      <input type="text" id="messageInput" placeholder="Сообщение">
+      <button id="sendMsgBtn">Отправить</button>
+    </div>
+  </div>
 
-        // =================== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ===================
-        let gun = null;
-        let currentBeaconURL = '';
-        let sessionId = generateSessionId();
-        let adminKeyPair = null;
-        let signedBeacons = new Map();
-        let connectionState = {
-            urlLoaded: false,
-            signatureVerified: false,
-            handshakeCompleted: false,
-            networkConnected: false
-        };
+  <!-- Оверлей видеозвонка -->
+  <div id="videoCallOverlay" class="video-call">
+    <div class="remote-video"><video id="remoteVideo" autoplay playsinline></video></div>
+    <div class="local-video"><video id="localVideo" autoplay playsinline muted></video></div>
+    <div class="call-controls"><button id="hangupBtn">📞</button></div>
+  </div>
 
-        // =================== СИСТЕМА ПОДПИСИ BEACON ===================
-        
-        // 1. Генерация ключей админки
-        function generateAdminKeys() {
-            try {
-                logProtocol('[Админка] Генерация ключей Ed25519...', 'info');
-                
-                // Генерируем пару ключей
-                adminKeyPair = nacl.sign.keyPair();
-                
-                // Сохраняем в localStorage
-                const keys = {
-                    publicKey: nacl.util.encodeBase64(adminKeyPair.publicKey),
-                    privateKey: nacl.util.encodeBase64(adminKeyPair.secretKey),
-                    timestamp: Date.now(),
-                    version: '1.0'
-                };
-                
-                localStorage.setItem('shadowgrid_admin_keys', JSON.stringify(keys));
-                
-                // Публикуем публичный ключ в GunDB
-                if (gun) {
-                    gun.get(CONFIG.gunAdminKeysPath).put({
-                        publicKey: keys.publicKey,
-                        timestamp: keys.timestamp,
-                        version: keys.version
-                    });
-                }
-                
-                // Обновляем интерфейс
-                updateAdminKeysDisplay();
-                
-                logProtocol('[Админка] Ключи сгенерированы и сохранены', 'success');
-                showNotification('🔑 Ключи админки сгенерированы!', 'success');
-                
-                return true;
-                
-            } catch (error) {
-                logProtocol(`[Админка] Ошибка генерации ключей: ${error.message}`, 'error');
-                return false;
-            }
-        }
+  <div id="qrPopup" class="qr-popup hidden"></div>
+</div>
 
-        // 2. Загрузка ключей админки
-        function loadAdminKeys() {
-            try {
-                const savedKeys = localStorage.getItem('shadowgrid_admin_keys');
-                if (savedKeys) {
-                    const keys = JSON.parse(savedKeys);
-                    
-                    adminKeyPair = {
-                        publicKey: nacl.util.decodeBase64(keys.publicKey),
-                        secretKey: nacl.util.decodeBase64(keys.privateKey)
-                    };
-                    
-                    updateAdminKeysDisplay();
-                    logProtocol('[Админка] Ключи загружены из localStorage', 'success');
-                    return true;
-                }
-            } catch (error) {
-                console.error('Error loading admin keys:', error);
-            }
-            
-            // Если ключей нет, генерируем новые
-            return generateAdminKeys();
-        }
+<script>
+  // ---------------------------- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ----------------------------
+  let currentUser = null;
+  let contacts = [];
+  let activeContactId = null;
+  let messages = {};
+  let currentCall = null;
+  let localStream = null;
+  let webTorrentClient = null;
 
-        // 3. Подпись Beacon админкой
-        async function adminSignBeacon() {
-            if (!adminKeyPair) {
-                showNotification('Сначала сгенерируйте ключи админки', 'warning');
-                return;
-            }
-            
-            const beaconUrl = document.getElementById('admin-beacon-url').value.trim();
-            const duration = parseInt(document.getElementById('signature-duration').value);
-            
-            if (!beaconUrl) {
-                showNotification('Введите URL Beacon', 'warning');
-                return;
-            }
-            
-            try {
-                logProtocol(`[Админка] Начинаем подпись Beacon: ${beaconUrl}`, 'info');
-                
-                // 1. Подготавливаем данные для подписи
-                const timestamp = Date.now();
-                const expires = duration > 0 ? timestamp + duration : 0;
-                const signatureId = generateSignatureId();
-                
-                const dataToSign = {
-                    beaconUrl: beaconUrl,
-                    timestamp: timestamp,
-                    expires: expires,
-                    signatureId: signatureId,
-                    adminPublicKey: nacl.util.encodeBase64(adminKeyPair.publicKey)
-                };
-                
-                const dataString = JSON.stringify(dataToSign);
-                
-                // 2. Подписываем данные
-                const signature = nacl.sign.detached(
-                    nacl.util.decodeUTF8(dataString),
-                    adminKeyPair.secretKey
-                );
-                
-                const signatureBase64 = nacl.util.encodeBase64(signature);
-                
-                // 3. Создаем объект подписи
-                const signedBeacon = {
-                    ...dataToSign,
-                    signature: signatureBase64,
-                    signedData: dataString,
-                    createdAt: timestamp,
-                    status: 'active'
-                };
-                
-                // 4. Сохраняем локально
-                signedBeacons.set(beaconUrl, signedBeacon);
-                saveSignedBeacons();
-                
-                // 5. Публикуем в GunDB
-                await publishSignatureToGunDB(signedBeacon);
-                
-                // 6. Отправляем подпись на Beacon через WebSocket
-                await sendSignatureToBeacon(beaconUrl, signedBeacon);
-                
-                // 7. Показываем результат
-                const signatureOutput = document.getElementById('signature-output');
-                const signatureResult = document.getElementById('signature-result');
-                
-                if (signatureOutput && signatureResult) {
-                    signatureOutput.textContent = `Подпись: ${signatureBase64.substring(0, 60)}...`;
-                    signatureResult.classList.remove('hidden');
-                }
-                
-                logProtocol(`[Админка] Beacon успешно подписан! Подпись: ${signatureBase64.substring(0, 30)}...`, 'success');
-                showNotification('✅ Beacon успешно подписан!', 'success');
-                
-                // Обновляем список Beacon
-                refreshBeaconsList();
-                
-            } catch (error) {
-                logProtocol(`[Админка] Ошибка подписи Beacon: ${error.message}`, 'error');
-                showNotification('❌ Ошибка подписи Beacon', 'error');
-            }
-        }
+  // ---------------------------- КРИПТОГРАФИЯ ----------------------------
+  function deriveKeyFromPassword(password, salt) {
+    return CryptoJS.PBKDF2(password, salt, { keySize: 256/32, iterations: 10000 }).toString();
+  }
+  function encryptMessage(text, keyHex) {
+    const iv = CryptoJS.lib.WordArray.random(16);
+    const encrypted = CryptoJS.AES.encrypt(text, CryptoJS.enc.Hex.parse(keyHex), { iv: iv });
+    return iv.toString() + ':' + encrypted.toString();
+  }
+  function decryptMessage(cipherText, keyHex) {
+    try {
+      const parts = cipherText.split(':');
+      const iv = CryptoJS.enc.Hex.parse(parts[0]);
+      const encrypted = parts.slice(1).join(':');
+      const decrypted = CryptoJS.AES.decrypt(encrypted, CryptoJS.enc.Hex.parse(keyHex), { iv: iv });
+      return decrypted.toString(CryptoJS.enc.Utf8);
+    } catch(e) { return "⚠️ Ошибка расшифровки"; }
+  }
 
-        // 4. Публикация подписи в GunDB
-        async function publishSignatureToGunDB(signedBeacon) {
-            if (!gun) return;
-            
-            try {
-                const beaconId = btoa(signedBeacon.beaconUrl).replace(/[^a-zA-Z0-9]/g, '_');
-                
-                // Публикуем подпись
-                gun.get(`${CONFIG.gunSignaturesPath}/${beaconId}`).put({
-                    ...signedBeacon,
-                    publishedAt: Date.now(),
-                    publishedBy: 'admin'
-                });
-                
-                // Также добавляем Beacon в список активных
-                gun.get(`${CONFIG.gunBeaconPath}/signed/${beaconId}`).put({
-                    url: signedBeacon.beaconUrl,
-                    signature: signedBeacon.signature,
-                    adminPublicKey: signedBeacon.adminPublicKey,
-                    timestamp: signedBeacon.timestamp,
-                    expires: signedBeacon.expires,
-                    status: 'active'
-                });
-                
-                logProtocol('[Админка] Подпись опубликована в GunDB', 'success');
-                return true;
-                
-            } catch (error) {
-                logProtocol(`[Админка] Ошибка публикации в GunDB: ${error.message}`, 'warning');
-                return false;
-            }
-        }
+  // ---------------------------- ХРАНЕНИЕ ----------------------------
+  function saveUserData() {
+    if (!currentUser) return;
+    const data = {
+      username: currentUser.username,
+      peerId: currentUser.peerId,
+      encryptionKey: currentUser.encryptionKey,
+      contacts: contacts.map(c => ({ peerId: c.peerId, username: c.username, encryptionKey: c.encryptionKey })),
+      messages: messages
+    };
+    localStorage.setItem('p2pmesh_user', JSON.stringify(data));
+  }
+  function loadUserData() {
+    const raw = localStorage.getItem('p2pmesh_user');
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch(e) { return null; }
+  }
 
-        // 5. Отправка подписи на Beacon через WebSocket
-        async function sendSignatureToBeacon(beaconUrl, signedBeacon) {
-            logProtocol(`[Админка] Отправка подписи на Beacon: ${beaconUrl}`, 'info');
-            
-            // В реальной системе здесь будет WebSocket соединение с Beacon
-            // Для демо имитируем успешную отправку
-            
-            return new Promise((resolve, reject) => {
-                setTimeout(() => {
-                    // Имитация успешной отправки
-                    logProtocol('[Админка] Подпись отправлена на Beacon. Beacon начал трансляцию сети.', 'success');
-                    
-                    // Обновляем статус Beacon
-                    updateBeaconStatus(beaconUrl, 'signed');
-                    
-                    resolve(true);
-                }, 1000);
-            });
-        }
+  // ---------------------------- P2P СОЕДИНЕНИЕ (simple-peer) ----------------------------
+  function createPeer(initiator, targetContact, offerSignal = null) {
+    const peer = new SimplePeer({
+      initiator: initiator,
+      trickle: false,
+      config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
+    });
+    peer.on('signal', data => {
+      if (initiator) {
+        const offerJson = JSON.stringify(data);
+        showQR(offerJson, "Ваш QR-оффер для контакта (отсканируйте другим устройством)");
+        localStorage.setItem('pending_offer', offerJson);
+      } else {
+        const answerJson = JSON.stringify(data);
+        showQR(answerJson, "Ответ для контакта (покажите инициатору)");
+      }
+    });
+    peer.on('connect', () => {
+      targetContact.peerInstance = peer;
+      targetContact.online = true;
+      peer.send(JSON.stringify({
+        type: 'handshake',
+        username: currentUser.username,
+        encryptionKey: currentUser.encryptionKey
+      }));
+      renderContactList();
+    });
+    peer.on('data', data => handlePeerData(peer, targetContact, data));
+    peer.on('close', () => {
+      targetContact.online = false;
+      renderContactList();
+    });
+    peer.on('error', err => console.error(err));
+    if (!initiator && offerSignal) peer.signal(offerSignal);
+    return peer;
+  }
 
-        // 6. Проверка подписи Beacon
-        async function verifyBeaconSignature(beaconUrl) {
-            logProtocol(`[Проверка] Проверка подписи Beacon: ${beaconUrl}`, 'info');
-            
-            updateStatus('signature', false, 'Поиск подписи в GunDB...');
-            
-            try {
-                // 1. Проверяем локальную базу
-                if (signedBeacons.has(beaconUrl)) {
-                    const signedBeacon = signedBeacons.get(beaconUrl);
-                    if (await verifySignatureObject(signedBeacon)) {
-                        updateStatus('signature', true, 'Подпись подтверждена (локально)');
-                        return true;
-                    }
-                }
-                
-                // 2. Проверяем в GunDB
-                const beaconId = btoa(beaconUrl).replace(/[^a-zA-Z0-9]/g, '_');
-                
-                return new Promise((resolve) => {
-                    gun.get(`${CONFIG.gunSignaturesPath}/${beaconId}`).once((signature) => {
-                        if (signature && signature.signature && signature.adminPublicKey) {
-                            // Проверяем срок действия
-                            if (signature.expires && Date.now() > signature.expires) {
-                                logProtocol(`[Проверка] Подпись просрочена`, 'warning');
-                                updateStatus('signature', false, 'Подпись просрочена');
-                                resolve(false);
-                                return;
-                            }
-                            
-                            // Проверяем подпись
-                            if (verifySignatureObject(signature)) {
-                                // Сохраняем локально
-                                signedBeacons.set(beaconUrl, signature);
-                                saveSignedBeacons();
-                                
-                                updateStatus('signature', true, 'Подпись подтверждена (GunDB)');
-                                logProtocol('[Проверка] Подпись Beacon подтверждена', 'success');
-                                resolve(true);
-                            } else {
-                                updateStatus('signature', false, 'Неверная подпись');
-                                resolve(false);
-                            }
-                        } else {
-                            logProtocol('[Проверка] Подпись не найдена в GunDB', 'warning');
-                            updateStatus('signature', false, 'Подпись не найдена');
-                            resolve(false);
-                        }
-                    });
-                });
-                
-            } catch (error) {
-                logProtocol(`[Проверка] Ошибка проверки подписи: ${error.message}`, 'error');
-                updateStatus('signature', false, 'Ошибка проверки');
-                return false;
-            }
-        }
+  function handlePeerData(peer, contact, rawData) {
+    try {
+      const packet = JSON.parse(rawData);
+      if (packet.type === 'handshake') {
+        contact.encryptionKey = packet.encryptionKey;
+        contact.username = packet.username;
+        saveUserData();
+        renderContactList();
+        peer.send(JSON.stringify({ type: 'handshake_ack', encryptionKey: currentUser.encryptionKey }));
+      } else if (packet.type === 'handshake_ack') {
+        contact.encryptionKey = packet.encryptionKey;
+        saveUserData();
+      } else if (packet.type === 'chat') {
+        const decrypted = decryptMessage(packet.cipher, contact.encryptionKey);
+        if (!messages[contact.peerId]) messages[contact.peerId] = [];
+        messages[contact.peerId].push({ text: decrypted, own: false, time: new Date().toLocaleTimeString() });
+        saveUserData();
+        if (activeContactId === contact.peerId) renderMessages();
+        showNotification(contact.username, decrypted);
+      } else if (packet.type === 'call_offer') {
+        handleIncomingCall(peer, packet);
+      }
+    } catch(e) { console.error(e); }
+  }
 
-        // 7. Верификация объекта подписи
-        function verifySignatureObject(signature) {
-            try {
-                const publicKey = nacl.util.decodeBase64(signature.adminPublicKey);
-                const signatureBytes = nacl.util.decodeBase64(signature.signature);
-                const message = nacl.util.decodeUTF8(signature.signedData || JSON.stringify({
-                    beaconUrl: signature.beaconUrl,
-                    timestamp: signature.timestamp,
-                    expires: signature.expires,
-                    signatureId: signature.signatureId,
-                    adminPublicKey: signature.adminPublicKey
-                }));
-                
-                return nacl.sign.detached.verify(message, signatureBytes, publicKey);
-            } catch (error) {
-                console.error('Signature verification error:', error);
-                return false;
-            }
-        }
-
-        // =================== ОБНОВЛЕННЫЙ МЕХАНИЗМ РУКОПОЖАТИЯ ===================
-        async function startHandshake() {
-            if (!validateCurrentURL()) {
-                showError('Неверный URL Beacon. Проверьте формат и повторите.');
-                return;
-            }
-            
-            // Сброс состояния
-            resetConnectionState();
-            
-            // Обновляем UI
-            const handshakeBtn = document.getElementById('handshake-btn');
-            handshakeBtn.disabled = true;
-            handshakeBtn.innerHTML = '<span class="spinner">⟳</span> Рукопожатие...';
-            
-            logProtocol(`[Система] Начинаем рукопожатие с Beacon: ${currentBeaconURL}`, 'info');
-            
-            try {
-                // 1. Проверяем подпись Beacon
-                updateStatus('signature', false, 'Проверка подписи админки...');
-                
-                const isSigned = await verifyBeaconSignature(currentBeaconURL);
-                if (!isSigned) {
-                    throw new Error('Beacon не подписан админкой. Подключение отклонено.');
-                }
-                
-                connectionState.signatureVerified = true;
-                logProtocol('[Система] Подпись Beacon подтверждена', 'success');
-                
-                // 2. Подготовка данных для рукопожатия
-                updateStatus('handshake', false, 'Подготовка данных...');
-                
-                const handshakeData = {
-                    sessionId: sessionId,
-                    beaconUrl: currentBeaconURL,
-                    timestamp: Date.now(),
-                    version: '3.0',
-                    protocol: 'ed25519',
-                    signatureVerified: true
-                };
-                
-                // 3. Отправка запроса
-                updateStatus('handshake', false, 'Отправка запроса к Beacon...');
-                logProtocol(`[Система] Отправка handshake запроса...`, 'info');
-                
-                const response = await performHandshakeRequest(currentBeaconURL, handshakeData);
-                
-                // 4. Обработка ответа
-                updateStatus('handshake', true, 'Рукопожатие выполнено');
-                connectionState.handshakeCompleted = true;
-                logProtocol(`[Система] Рукопожатие успешно. Ответ получен.`, 'success');
-                
-                // 5. Подключение к сети
-                await connectToNetwork(response);
-                
-                // Успех
-                showSuccess(response);
-                
-            } catch (error) {
-                handleHandshakeError(error);
-            } finally {
-                handshakeBtn.disabled = false;
-                handshakeBtn.innerHTML = '🔄 Начать рукопожатие';
-            }
-        }
-
-        // =================== GUNDB ИНИЦИАЛИЗАЦИЯ (ОБНОВЛЕННАЯ) ===================
-        function initializeGunDB() {
-            try {
-                if (gun) return;
-                
-                gun = Gun(CONFIG.gunPeers);
-                
-                // Слушаем подписанные Beacon
-                gun.get(`${CONFIG.gunBeaconPath}/signed`).map().on((beacon, id) => {
-                    if (beacon && beacon.url) {
-                        logProtocol(`[GunDB] Обнаружен подписанный Beacon: ${shortenURL(beacon.url)}`, 'info');
-                        updateBeaconOnMap(beacon, id);
-                    }
-                });
-                
-                // Слушаем обновления ключей админки
-                gun.get(CONFIG.gunAdminKeysPath).on((keys) => {
-                    if (keys && keys.publicKey) {
-                        logProtocol('[GunDB] Получены обновленные ключи админки', 'info');
-                    }
-                });
-                
-                logProtocol('GunDB инициализирован для обнаружения подписанных Beacon', 'success');
-                
-            } catch (error) {
-                logProtocol(`Ошибка инициализации GunDB: ${error.message}`, 'error');
-            }
-        }
-
-        // =================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===================
-        function generateSignatureId() {
-            return 'sig_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        }
-
-        function saveSignedBeacons() {
-            const beaconsArray = Array.from(signedBeacons.entries());
-            localStorage.setItem('shadowgrid_signed_beacons', JSON.stringify(beaconsArray));
-        }
-
-        function loadSignedBeacons() {
-            try {
-                const saved = localStorage.getItem('shadowgrid_signed_beacons');
-                if (saved) {
-                    const beaconsArray = JSON.parse(saved);
-                    signedBeacons = new Map(beaconsArray);
-                    logProtocol(`Загружено ${signedBeacons.size} подписанных Beacon`, 'info');
-                }
-            } catch (error) {
-                console.error('Error loading signed beacons:', error);
-            }
-        }
-
-        function updateAdminKeysDisplay() {
-            if (!adminKeyPair) return;
-            
-            const publicKeyElement = document.getElementById('admin-public-key');
-            const privateKeyElement = document.getElementById('admin-private-key');
-            
-            if (publicKeyElement) {
-                const publicKeyBase64 = nacl.util.encodeBase64(adminKeyPair.publicKey);
-                publicKeyElement.textContent = `${publicKeyBase64.substring(0, 30)}...`;
-                publicKeyElement.title = publicKeyBase64;
-            }
-            
-            if (privateKeyElement) {
-                const privateKeyBase64 = nacl.util.encodeBase64(adminKeyPair.secretKey);
-                privateKeyElement.textContent = '••••••••••••••••••••••••••••••••';
-                privateKeyElement.title = privateKeyBase64;
-                privateKeyElement.dataset.key = privateKeyBase64;
-            }
-        }
-
-        function refreshBeaconsList() {
-            const listElement = document.getElementById('signed-beacons-list');
-            if (!listElement) return;
-            
-            listElement.innerHTML = '';
-            
-            signedBeacons.forEach((beacon, url) => {
-                const item = document.createElement('div');
-                item.style.cssText = `
-                    padding: 0.5rem;
-                    background: rgba(0,0,0,0.3);
-                    border-radius: 4px;
-                    margin-bottom: 0.5rem;
-                    border-left: 3px solid var(--accent-green);
-                `;
-                
-                const expiresText = beacon.expires ? 
-                    new Date(beacon.expires).toLocaleString() : 'Бессрочно';
-                
-                item.innerHTML = `
-                    <div style="display: flex; justify-content: space-between;">
-                        <div style="font-weight: bold; color: var(--primary);">${shortenURL(url, 30)}</div>
-                        <div style="font-size: 0.7rem; color: var(--text-secondary);">${beacon.status || 'active'}</div>
-                    </div>
-                    <div style="font-size: 0.7rem; color: var(--text-secondary);">
-                        Подписано: ${new Date(beacon.timestamp).toLocaleString()}<br>
-                        Истекает: ${expiresText}
-                    </div>
-                `;
-                
-                listElement.appendChild(item);
-            });
-            
-            if (signedBeacons.size === 0) {
-                listElement.innerHTML = '<div style="color: var(--text-secondary); text-align: center; padding: 1rem;">Нет подписанных Beacon</div>';
-            }
-        }
-
-        // =================== ИНТЕРФЕЙС АДМИНКИ ===================
-        function showAdminPanel() {
-            document.getElementById('admin-modal').style.display = 'block';
-            document.body.style.overflow = 'hidden';
-            refreshBeaconsList();
-        }
-
-        function switchTab(tabName) {
-            // Скрываем все вкладки
-            document.querySelectorAll('.tab-button').forEach(btn => {
-                btn.classList.remove('active');
-                btn.style.borderBottom = '1px solid rgba(255,255,255,0.1)';
-                btn.style.color = 'var(--text-secondary)';
-            });
-            
-            document.querySelectorAll('.tab-content').forEach(content => {
-                content.classList.add('hidden');
-            });
-            
-            // Активируем выбранную вкладку
-            const tabButton = document.getElementById(`tab-${tabName}`);
-            const tabContent = document.getElementById(`tab-${tabName}-content`);
-            
-            if (tabButton && tabContent) {
-                tabButton.classList.add('active');
-                tabButton.style.borderBottom = '2px solid var(--primary)';
-                tabButton.style.color = 'var(--primary)';
-                tabContent.classList.remove('hidden');
-            }
-        }
-
-        // =================== ИНИЦИАЛИЗАЦИЯ СИСТЕМЫ ===================
-        function initializeSystem() {
-            logProtocol('[Система] Инициализация ShadowGrid Beacon v3.0', 'info');
-            
-            // 1. Загружаем ключи админки
-            loadAdminKeys();
-            
-            // 2. Загружаем подписанные Beacon
-            loadSignedBeacons();
-            
-            // 3. Устанавливаем дефолтный Beacon URL
-            currentBeaconURL = CONFIG.defaultBeaconURL;
-            document.getElementById('beacon-url-input').value = currentBeaconURL;
-            updateStatus('url', true, `URL установлен: ${shortenURL(currentBeaconURL)}`);
-            enableHandshakeButton();
-            
-            // 4. Инициализируем GunDB
-            initializeGunDB();
-            
-            // 5. Обновляем карту
-            initializeMap();
-            
-            // 6. Обновляем статистику
-            updateStats();
-            
-            logProtocol('[Система] Система инициализирована. Готов к подключению.', 'info');
-            
-            // Показываем скрытый интерфейс админки
-            setTimeout(() => {
-                document.getElementById('admin-tools').classList.remove('hidden');
-            }, 2000);
-        }
-
-        // =================== ОБНОВЛЕННЫЙ USE_DETECTED_BEACON ===================
-        function useDetectedBeacon() {
-            logProtocol('[Автоопределение] Поиск подписанных Beacon в GunDB...', 'info');
-            
-            updateStatus('url', false, 'Поиск подписанных Beacon...');
-            
-            if (!gun) {
-                logProtocol('GunDB не инициализирован', 'warning');
-                return;
-            }
-            
-            // Ищем ТОЛЬКО подписанные Beacon
-            gun.get(`${CONFIG.gunBeaconPath}/signed`).map().once((beacon, id) => {
-                if (beacon && beacon.url && beacon.signature) {
-                    // Проверяем срок действия
-                    if (beacon.expires && Date.now() > beacon.expires) {
-                        logProtocol(`Beacon просрочен: ${shortenURL(beacon.url)}`, 'warning');
-                        return;
-                    }
-                    
-                    currentBeaconURL = beacon.url;
-                    document.getElementById('beacon-url-input').value = beacon.url;
-                    saveBeaconURL(beacon.url);
-                    
-                    updateStatus('url', true, `Найден подписанный Beacon: ${shortenURL(beacon.url)}`);
-                    enableHandshakeButton();
-                    logProtocol(`Подписанный Beacon обнаружен: ${beacon.url}`, 'success');
-                    
-                    // Обновляем карту
-                    updateBeaconStatus(beacon.url, 'signed');
-                }
-            });
-            
-            setTimeout(() => {
-                if (!currentBeaconURL) {
-                    logProtocol('Подписанные Beacon не найдены. Используйте админку для подписи.', 'warning');
-                    updateStatus('url', false, 'Подписанные Beacon не найдены');
-                }
-            }, 3000);
-        }
-
-        // =================== ОБНОВЛЕННАЯ КАРТА ===================
-        function initializeMap() {
-            const container = document.getElementById('map-container');
-            if (!container) return;
-            
-            container.innerHTML = '';
-            
-            // Основной Beacon
-            const mainBeacon = {
-                lat: 35.6762,
-                lon: 139.6503,
-                url: CONFIG.defaultBeaconURL,
-                status: signedBeacons.has(CONFIG.defaultBeaconURL) ? 'signed' : 'pending'
+  function generateOfferForNewContact() {
+    const tempPeer = new SimplePeer({ initiator: true, trickle: false });
+    tempPeer.on('signal', data => {
+      const offerJson = JSON.stringify(data);
+      showQR(offerJson, "QR-оффер для нового контакта");
+      localStorage.setItem('pending_offer', offerJson);
+      setTimeout(() => {
+        const answer = prompt("После того как другой пользователь отсканировал и получил ответ, вставьте ответ сюда:");
+        if (answer) {
+          try {
+            const answerSignal = JSON.parse(answer);
+            tempPeer.signal(answerSignal);
+            const newPeerId = 'peer_' + Date.now() + '_' + Math.random();
+            const newContact = {
+              peerId: newPeerId,
+              username: 'Новый контакт',
+              encryptionKey: CryptoJS.lib.WordArray.random(32).toString(),
+              peerInstance: tempPeer,
+              online: true
             };
-            
-            const beacons = [
-                { lat: 55.7558, lon: 37.6173, status: 'active', url: 'wss://beacon-moscow.shadowgrid.net' },
-                { lat: 48.8566, lon: 2.3522, status: 'active', url: 'wss://beacon-paris.shadowgrid.net' },
-                { lat: 40.7128, lon: -74.0060, status: 'active', url: 'wss://beacon-ny.shadowgrid.net' },
-                mainBeacon,
-                { lat: 1.3521, lon: 103.8198, status: 'pending', url: 'wss://beacon-sg.shadowgrid.net' }
-            ];
-            
-            const width = container.offsetWidth;
-            const height = container.offsetHeight;
-            
-            beacons.forEach((beacon) => {
-                const x = (beacon.lon + 180) * (width / 360);
-                const y = (90 - beacon.lat) * (height / 180);
-                
-                const dot = document.createElement('div');
-                dot.className = 'node-point';
-                
-                // Цвет в зависимости от статуса
-                let color = 'var(--accent-orange)';
-                let shadow = '0 0 6px var(--accent-orange)';
-                
-                if (beacon.url === currentBeaconURL) {
-                    color = 'var(--accent-green)';
-                    shadow = '0 0 10px var(--accent-green)';
-                } else if (beacon.status === 'signed') {
-                    color = 'var(--secondary)';
-                    shadow = '0 0 8px var(--secondary)';
-                } else if (beacon.status === 'active') {
-                    color = 'var(--accent-blue)';
-                    shadow = '0 0 8px var(--accent-blue)';
-                }
-                
-                dot.style.background = color;
-                dot.style.boxShadow = shadow;
-                dot.title = `Beacon: ${shortenURL(beacon.url)}\nСтатус: ${beacon.status}`;
-                dot.style.left = `${x}px`;
-                dot.style.top = `${y}px`;
-                
-                // Анимация для текущего Beacon
-                if (beacon.url === currentBeaconURL) {
-                    dot.classList.add('pulse');
-                }
-                
-                container.appendChild(dot);
-            });
+            contacts.push(newContact);
+            saveUserData();
+            renderContactList();
+            tempPeer.on('data', d => handlePeerData(tempPeer, newContact, d));
+          } catch(e) { alert('Неверный ответ'); }
         }
+      }, 100);
+    });
+  }
 
-        // =================== ИНИЦИАЛИЗАЦИЯ ПРИ ЗАГРУЗКЕ ===================
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('🚀 ShadowGrid Beacon v3.0 - Система подписи Beacon');
-            
-            // Инициализируем систему
-            initializeSystem();
-            
-            // Обработчики событий
-            window.addEventListener('resize', initializeMap);
-            document.getElementById('beacon-url-input').addEventListener('input', validateCurrentURL);
-            
-            // Обновляем статистику каждые 10 секунд
-            setInterval(updateStats, 10000);
-        });
+  function addContactByOffer(offerJson) {
+    try {
+      const offerSignal = JSON.parse(offerJson);
+      const newPeerId = 'peer_' + Date.now() + '_' + Math.random();
+      const newContact = {
+        peerId: newPeerId,
+        username: 'Соединяемся...',
+        encryptionKey: CryptoJS.lib.WordArray.random(32).toString(),
+        peerInstance: null,
+        online: false
+      };
+      const peer = createPeer(false, newContact, offerSignal);
+      newContact.peerInstance = peer;
+      contacts.push(newContact);
+      saveUserData();
+      renderContactList();
+    } catch(e) { alert('Неверный оффер'); }
+  }
 
-        // =================== ОСТАЛЬНЫЕ ФУНКЦИИ (без изменений) ===================
-        // Все остальные функции (validateCurrentURL, showSuccess, showError и т.д.)
-        // остаются БЕЗ ИЗМЕНЕНИЙ, как в вашем исходном файле
-        // Я не буду их дублировать здесь для экономии места
-        
-        // Вот список функций, которые должны остаться как есть:
-        // - loadBeaconFromURL()
-        // - loadBeaconFromStorage()
-        // - saveBeaconURL()
-        // - clearBeaconURL()
-        // - validateCurrentURL()
-        // - performHandshakeRequest()
-        // - connectToNetwork()
-        // - updateStatus()
-        // - enableHandshakeButton()
-        // - disableHandshakeButton()
-        // - showSuccess()
-        // - showError()
-        // - handleHandshakeError()
-        // - resetConnectionState()
-        // - generateSessionId()
-        // - isValidURL()
-        // - shortenURL()
-        // - logProtocol()
-        // - delay()
-        // - scrollToBeacon()
-        // - showQRCode()
-        // - retryConnection()
-        // - showDebugInfo()
-        // - testConnection()
-        // - closeModal()
-        // - updateStats()
-        // - updateBeaconOnMap()
-        // - updateBeaconStatus()
-        // - showNotification()
-        // - copyToClipboard()
-        // - exportAdminKeys()
-        // - importAdminKeys()
-        // - revokeBeaconSignature()
-        
-    </script>
+  // ---------------------------- РАСПРОСТРАНЕНИЕ ПРИЛОЖЕНИЯ (платформозависимо) ----------------------------
+  function shareApp() {
+    if (window.isIOS) {
+      // iOS: экспорт файла через AirDrop
+      const htmlContent = document.documentElement.outerHTML;
+      const blob = new Blob([htmlContent], {type: 'text/html'});
+      const file = new File([blob], 'P2PChat.html', {type: 'text/html'});
+      // Используем Web Share API (если поддерживается) или создаём ссылку для скачивания
+      if (navigator.share && navigator.canShare && navigator.canShare({files: [file]})) {
+        navigator.share({
+          title: 'P2P Mesh Chat',
+          text: 'Установите приложение P2P Mesh',
+          files: [file]
+        }).catch(err => console.log('Поделиться не удалось', err));
+      } else {
+        // Альтернатива: создать временную ссылку и предложить сохранить файл
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'P2PChat.html';
+        a.click();
+        URL.revokeObjectURL(url);
+        alert('Файл сохранён. Передайте его через AirDrop или другим способом.');
+      }
+    } else {
+      // Android/Desktop: используем WebTorrent
+      if (typeof WebTorrent === 'undefined') {
+        alert('WebTorrent не загружен. Проверьте интернет.');
+        return;
+      }
+      if (!webTorrentClient) webTorrentClient = new WebTorrent();
+      const htmlContent = document.documentElement.outerHTML;
+      const blob = new Blob([htmlContent], {type: 'text/html'});
+      const file = new File([blob], 'index.html', {type: 'text/html'});
+      webTorrentClient.seed(file, { announce: ['wss://tracker.webtorrent.io', 'wss://tracker.openwebtorrent.com'] }, torrent => {
+        const magnetUri = torrent.magnetURI;
+        showQR(magnetUri, "Отсканируйте QR, чтобы установить приложение (Android/Desktop)");
+      });
+    }
+  }
+
+  function showInstallInstructions() {
+    const container = document.getElementById('installMethods');
+    if (window.isIOS) {
+      container.innerHTML = `
+        <div style="background:#2c2c2e; padding:12px; border-radius:12px; margin-top:8px;">
+          <div style="font-weight:bold; margin-bottom:8px;">📱 Установка на iPhone:</div>
+          <div>1. Попросите друга отправить вам файл P2PChat.html через AirDrop</div>
+          <div>2. Откройте файл в Safari</div>
+          <div>3. Нажмите «Поделиться» → «На экран «Домой»»</div>
+          <button id="requestFromFriendBtn" class="share-btn" style="margin-top:8px;">📲 Попросить у друга (AirDrop)</button>
+        </div>
+      `;
+      document.getElementById('requestFromFriendBtn')?.addEventListener('click', () => {
+        alert('Попросите друга открыть приложение и нажать "Поделиться приложением", затем передать вам файл через AirDrop.');
+      });
+    } else {
+      container.innerHTML = `
+        <div style="background:#2c2c2e; padding:12px; border-radius:12px; margin-top:8px;">
+          <div style="font-weight:bold; margin-bottom:8px;">🤖 Установка на Android:</div>
+          <div>1. Попросите друга нажать «Поделиться приложением» и отсканировать QR</div>
+          <div>2. Или вручную введите magnet-ссылку</div>
+          <input type="text" id="magnetInput" placeholder="Вставьте magnet-ссылку" style="margin-top:8px;">
+          <button id="installFromMagnetBtn" class="share-btn" style="margin-top:4px;">Установить из magnet-ссылки</button>
+        </div>
+      `;
+      document.getElementById('installFromMagnetBtn')?.addEventListener('click', () => {
+        const magnet = document.getElementById('magnetInput').value;
+        if (magnet) installFromMagnet(magnet);
+      });
+    }
+  }
+
+  async function installFromMagnet(magnet) {
+    if (typeof WebTorrent === 'undefined') {
+      alert('WebTorrent не загружен');
+      return;
+    }
+    if (!webTorrentClient) webTorrentClient = new WebTorrent();
+    webTorrentClient.add(magnet, torrent => {
+      torrent.files[0].getBuffer((err, buffer) => {
+        if (err) { alert('Ошибка загрузки'); return; }
+        const html = new TextDecoder().decode(buffer);
+        localStorage.setItem('p2pmesh_build', html);
+        if (confirm('Новая версия получена. Обновить приложение?')) {
+          document.open();
+          document.write(html);
+          document.close();
+          location.reload();
+        }
+      });
+    });
+  }
+
+  // ---------------------------- ОТПРАВКА СООБЩЕНИЙ ----------------------------
+  function sendChatMessage(contact, text) {
+    if (!contact.peerInstance || !contact.peerInstance.connected) {
+      alert('Контакт не в сети');
+      return;
+    }
+    const cipher = encryptMessage(text, contact.encryptionKey);
+    contact.peerInstance.send(JSON.stringify({ type: 'chat', cipher: cipher }));
+    if (!messages[contact.peerId]) messages[contact.peerId] = [];
+    messages[contact.peerId].push({ text, own: true, time: new Date().toLocaleTimeString() });
+    saveUserData();
+    renderMessages();
+  }
+
+  // ---------------------------- ЗВОНКИ ----------------------------
+  async function startCall(video) {
+    if (!activeContactId) return;
+    const contact = contacts.find(c => c.peerId === activeContactId);
+    if (!contact || !contact.peerInstance) return;
+    const stream = await navigator.mediaDevices.getUserMedia({ video: video, audio: true });
+    localStream = stream;
+    document.getElementById('localVideo').srcObject = stream;
+    const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    stream.getTracks().forEach(track => pc.addTrack(track, stream));
+    pc.onicecandidate = event => {
+      if (event.candidate) {
+        contact.peerInstance.send(JSON.stringify({ type: 'call_candidate', candidate: event.candidate }));
+      }
+    };
+    pc.ontrack = event => {
+      document.getElementById('remoteVideo').srcObject = event.streams[0];
+    };
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    contact.peerInstance.send(JSON.stringify({ type: 'call_offer', sdp: pc.localDescription }));
+    currentCall = { pc, contact };
+    document.getElementById('videoCallOverlay').classList.add('active');
+  }
+
+  function handleIncomingCall(peer, packet) {
+    if (currentCall) {
+      peer.send(JSON.stringify({ type: 'call_busy' }));
+      return;
+    }
+    const accept = confirm('Входящий звонок. Принять?');
+    if (!accept) return;
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
+      localStream = stream;
+      document.getElementById('localVideo').srcObject = stream;
+      const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+      stream.getTracks().forEach(track => pc.addTrack(track, stream));
+      pc.onicecandidate = event => {
+        if (event.candidate) {
+          peer.send(JSON.stringify({ type: 'call_candidate', candidate: event.candidate }));
+        }
+      };
+      pc.ontrack = event => {
+        document.getElementById('remoteVideo').srcObject = event.streams[0];
+      };
+      pc.setRemoteDescription(new RTCSessionDescription(packet.sdp));
+      pc.createAnswer().then(answer => {
+        pc.setLocalDescription(answer);
+        peer.send(JSON.stringify({ type: 'call_answer', sdp: pc.localDescription }));
+      });
+      currentCall = { pc, contact: contacts.find(c => c.peerInstance === peer) };
+      document.getElementById('videoCallOverlay').classList.add('active');
+    });
+  }
+
+  function endCall() {
+    if (currentCall) {
+      currentCall.pc.close();
+      if (localStream) localStream.getTracks().forEach(t => t.stop());
+      localStream = null;
+      currentCall = null;
+    }
+    document.getElementById('videoCallOverlay').classList.remove('active');
+  }
+
+  // ---------------------------- UI ----------------------------
+  function renderContactList() {
+    const container = document.getElementById('contactsList');
+    container.innerHTML = '';
+    for (let contact of contacts) {
+      const div = document.createElement('div');
+      div.className = 'contact-item';
+      div.innerHTML = `
+        <div>
+          <span class="contact-name-list">${escapeHtml(contact.username)}</span>
+          ${contact.online ? '<span class="online-badge"></span>' : '<span style="font-size:10px; color:gray;"> offline</span>'}
+        </div>
+      `;
+      div.onclick = () => openChat(contact);
+      container.appendChild(div);
+    }
+    if (contacts.length === 0) container.innerHTML = '<div style="text-align:center; padding:20px;">Нет контактов. Используйте "Мой QR-оффер" или "Добавить по офферу".</div>';
+    
+    const chatsContainer = document.getElementById('chatsList');
+    chatsContainer.innerHTML = '';
+    for (let contact of contacts) {
+      const lastMsg = messages[contact.peerId] ? messages[contact.peerId][messages[contact.peerId].length-1] : null;
+      const div = document.createElement('div');
+      div.className = 'contact-item';
+      div.innerHTML = `
+        <div>
+          <span class="contact-name-list">${escapeHtml(contact.username)}</span>
+          ${contact.online ? '<span class="online-badge"></span>' : ''}
+          <div style="font-size:12px; color:#8e8e93;">${lastMsg ? lastMsg.text.substring(0,30) : 'Нет сообщений'}</div>
+        </div>
+      `;
+      div.onclick = () => openChat(contact);
+      chatsContainer.appendChild(div);
+    }
+    if (contacts.length === 0) chatsContainer.innerHTML = '<div style="text-align:center; padding:20px;">Нет чатов. Добавьте контакт.</div>';
+  }
+
+  function openChat(contact) {
+    activeContactId = contact.peerId;
+    document.getElementById('chatContactName').innerText = contact.username;
+    renderMessages();
+    document.getElementById('mainScreen').classList.remove('active');
+    document.getElementById('chatScreen').classList.add('active');
+  }
+
+  function renderMessages() {
+    const container = document.getElementById('messagesContainer');
+    container.innerHTML = '';
+    const msgs = messages[activeContactId] || [];
+    msgs.forEach(msg => {
+      const div = document.createElement('div');
+      div.className = `message ${msg.own ? 'own' : ''}`;
+      div.innerHTML = `<div class="message-text">${escapeHtml(msg.text)}</div><div class="message-time">${msg.time}</div>`;
+      container.appendChild(div);
+    });
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function showQR(text, title) {
+    const qrDiv = document.getElementById('qrPopup');
+    qrDiv.innerHTML = `<div style="margin-bottom:8px; font-weight:bold;">${title}</div>`;
+    new QRCode(qrDiv, { text: text, width: 200, height: 200 });
+    qrDiv.classList.remove('hidden');
+    setTimeout(() => qrDiv.classList.add('hidden'), 30000);
+  }
+
+  function showNotification(title, body) {
+    if (Notification.permission === 'granted' && document.hidden && navigator.serviceWorker) {
+      navigator.serviceWorker.ready.then(reg => reg.showNotification(title, { body, icon: 'icon.png' }));
+    }
+  }
+
+  function escapeHtml(str) { return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
+
+  // ---------------------------- РЕГИСТРАЦИЯ / ЛОГИН ----------------------------
+  function registerOrLogin(username, password) {
+    const stored = localStorage.getItem('p2pmesh_auth');
+    const hash = CryptoJS.SHA256(password).toString();
+    if (stored) {
+      const data = JSON.parse(stored);
+      if (data.username === username && data.passwordHash === hash) {
+        currentUser = { username: data.username, peerId: data.peerId, encryptionKey: data.encryptionKey };
+        const saved = loadUserData();
+        if (saved) {
+          contacts = saved.contacts.map(c => ({ ...c, peerInstance: null, online: false }));
+          messages = saved.messages;
+        }
+        renderContactList();
+        showMainScreen();
+        return;
+      } else { alert('Неверный пароль'); return; }
+    } else {
+      const salt = CryptoJS.lib.WordArray.random(16).toString();
+      const encryptionKey = deriveKeyFromPassword(password, salt);
+      const peerId = 'user_' + Date.now() + '_' + Math.random().toString(36);
+      currentUser = { username, peerId, encryptionKey, salt };
+      localStorage.setItem('p2pmesh_auth', JSON.stringify({ username, passwordHash: hash, salt, peerId, encryptionKey }));
+      saveUserData();
+      showMainScreen();
+    }
+  }
+
+  function showMainScreen() {
+    document.getElementById('authScreen').classList.remove('active');
+    document.getElementById('mainScreen').classList.add('active');
+    document.getElementById('networkInfo').innerText = `Ваш ID: ${currentUser.peerId.slice(0,12)}...`;
+    renderContactList();
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.onclick = () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const tabName = tab.dataset.tab;
+        document.getElementById('chatsList').classList.add('hidden');
+        document.getElementById('contactsList').classList.add('hidden');
+        if (tabName === 'chats') {
+          document.getElementById('chatsList').classList.remove('hidden');
+          document.getElementById('addContactPanel').classList.add('hidden');
+        } else {
+          document.getElementById('contactsList').classList.remove('hidden');
+          document.getElementById('addContactPanel').classList.remove('hidden');
+        }
+      };
+    });
+    document.querySelector('.tab[data-tab="chats"]').click();
+  }
+
+  // ---------------------------- ОБРАБОТЧИКИ UI ----------------------------
+  document.getElementById('loginBtn').onclick = () => {
+    const user = document.getElementById('loginUsername').value.trim();
+    const pass = document.getElementById('loginPassword').value;
+    if (user && pass) registerOrLogin(user, pass);
+    else alert('Введите логин и пароль');
+  };
+  document.getElementById('generateOfferBtn').onclick = () => generateOfferForNewContact();
+  document.getElementById('addContactBtn').onclick = () => {
+    const offer = document.getElementById('newContactOffer').value.trim();
+    if (offer) addContactByOffer(offer);
+    else alert('Вставьте оффер');
+  };
+  document.getElementById('sendMsgBtn').onclick = () => {
+    const text = document.getElementById('messageInput').value;
+    if (!text || !activeContactId) return;
+    const contact = contacts.find(c => c.peerId === activeContactId);
+    if (contact) sendChatMessage(contact, text);
+    document.getElementById('messageInput').value = '';
+  };
+  document.getElementById('chatBackBtn').onclick = () => {
+    document.getElementById('chatScreen').classList.remove('active');
+    document.getElementById('mainScreen').classList.add('active');
+    activeContactId = null;
+  };
+  document.getElementById('audioCallBtn').onclick = () => startCall(false);
+  document.getElementById('videoCallBtn').onclick = () => startCall(true);
+  document.getElementById('hangupBtn').onclick = () => endCall();
+  document.getElementById('shareAppBtn').onclick = () => shareApp();
+
+  // Показать инструкции по установке на экране авторизации
+  showInstallInstructions();
+
+  // Service Worker (для PWA)
+  if ('serviceWorker' in navigator) {
+    const swCode = `self.addEventListener('fetch', e => e.respondWith(fetch(e.request)));`;
+    const blob = new Blob([swCode], {type: 'application/javascript'});
+    const swUrl = URL.createObjectURL(blob);
+    navigator.serviceWorker.register(swUrl).then(reg => {
+      console.log('SW registered');
+      if (Notification.permission !== 'granted') Notification.requestPermission();
+    });
+  }
+
+  // Автозаполнение логина
+  (function() {
+    const auth = localStorage.getItem('p2pmesh_auth');
+    if (auth) {
+      try {
+        const data = JSON.parse(auth);
+        document.getElementById('loginUsername').value = data.username;
+      } catch(e) {}
+    }
+    // Проверка обновления через magnet (для Android)
+    const pendingBuild = localStorage.getItem('p2pmesh_build');
+    if (pendingBuild && confirm('Обнаружена новая версия. Обновить?')) {
+      localStorage.removeItem('p2pmesh_build');
+      document.open();
+      document.write(pendingBuild);
+      document.close();
+      location.reload();
+    }
+  })();
+</script>
 </body>
 </html>
